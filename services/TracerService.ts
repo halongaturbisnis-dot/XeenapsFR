@@ -1,5 +1,5 @@
 
-import { TracerProject, TracerLog, TracerReference, TracerReferenceContent, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse } from '../types';
+import { TracerProject, TracerLog, TracerReference, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse, TracerLogContent, TracerReferenceContent } from '../types';
 import { GAS_WEB_APP_URL } from '../constants';
 import { 
   fetchTracerProjectsFromSupabase, 
@@ -16,9 +16,10 @@ import {
   deleteTracerTodoFromSupabase,
   fetchTracerFinanceFromSupabase,
   upsertTracerFinanceToSupabase,
-  deleteTracerFinanceFromSupabase
+  deleteTracerFinanceFromSupabase,
+  fetchAllPendingTodosFromSupabase
 } from './TracerSupabaseService';
-import { deleteRemoteFile, fetchVaultContent } from './ActivityService';
+import { deleteRemoteFile } from './ActivityService';
 import { fetchFileContent } from './gasService';
 
 /**

@@ -18,13 +18,14 @@ CREATE TABLE IF NOT EXISTS public.activities (
     "credit" TEXT,
     "link" TEXT,
     "isFavorite" BOOLEAN DEFAULT false,
-    "vaultJsonId" TEXT, -- Sharding ID untuk dokumentasi
+    "vaultJsonId" TEXT, -- Sharding ID untuk dokumentasi (Legacy/Backup)
     "storageNodeUrl" TEXT, -- URL Worker GAS untuk vault
     "certificateFileId" TEXT, -- ID File sertifikat fisik di Drive
     "certificateNodeUrl" TEXT, -- URL Worker GAS untuk sertifikat
     "createdAt" TIMESTAMPTZ DEFAULT now(),
     "updatedAt" TIMESTAMPTZ DEFAULT now(),
-    "search_all" TEXT -- Kolom index pencarian gabungan
+    "search_all" TEXT, -- Kolom index pencarian gabungan
+    "vault_items" JSONB DEFAULT '[]'::jsonb -- Direct Registry untuk lampiran
 );
 
 -- Indexing untuk performa filter

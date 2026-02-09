@@ -1,4 +1,5 @@
 
+
 export enum SourceType {
   LINK = 'LINK',
   FILE = 'FILE',
@@ -273,7 +274,8 @@ export interface ActivityItem {
   credit: string;
   link: string;
   isFavorite: boolean;
-  vaultJsonId: string;
+  vaultJsonId: string; // Deprecated but kept for type safety
+  vault_items?: ActivityVaultItem[]; // New Direct Registry
   storageNodeUrl: string;
   certificateFileId?: string;
   certificateNodeUrl?: string;

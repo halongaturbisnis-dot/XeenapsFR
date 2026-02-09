@@ -1,4 +1,5 @@
 
+
 import { ActivityItem, ActivityVaultItem, GASResponse } from '../types';
 import { GAS_WEB_APP_URL } from '../constants';
 import { 
@@ -49,7 +50,7 @@ export const deleteActivity = async (id: string): Promise<boolean> => {
   window.dispatchEvent(new CustomEvent('xeenaps-activity-deleted', { detail: id }));
 
   try {
-    // 1. Fetch Item to get File IDs (Cert & Vault)
+    // 1. Fetch Item to get File IDs (Cert)
     const item = await fetchActivityByIdFromSupabase(id);
     
     // 2. Physical File Cleanup (Fire & Forget to GAS)
@@ -57,11 +58,17 @@ export const deleteActivity = async (id: string): Promise<boolean> => {
       if (item.certificateFileId && item.certificateNodeUrl) {
          deleteRemoteFile(item.certificateFileId, item.certificateNodeUrl);
       }
-      if (item.vaultJsonId && item.storageNodeUrl) {
-         deleteRemoteFile(item.vaultJsonId, item.storageNodeUrl);
-         // Note: Deep vault content cleanup (files inside vault) is complex in background 
-         // without parsing JSON. We rely on 'Lazy Cleanup' or manual vault purge for now 
-         // to keep UI snappy, or assume specific cleanup isn't critical for orphan files.
+      
+      // Cleanup files inside the vault_items array if present
+      if (item.vault_items && Array.isArray(item.vault_items)) {
+         item.vault_items.forEach(vItem => {
+            if (vItem.type === 'FILE' && vItem.fileId && vItem.nodeUrl) {
+              // Ensure we don't delete optimistic placeholders
+              if (!vItem.fileId.startsWith('optimistic_')) {
+                 deleteRemoteFile(vItem.fileId, vItem.nodeUrl);
+              }
+            }
+         });
       }
     }
 
@@ -87,62 +94,6 @@ export const deleteRemoteFile = async (fileId: string, nodeUrl: string): Promise
     return result.status === 'success';
   } catch (e) {
     return false;
-  }
-};
-
-/**
- * SHARDING: Fetch Vault JSON Content from Storage Node
- */
-export const fetchVaultContent = async (vaultJsonId: string, nodeUrl?: string): Promise<ActivityVaultItem[]> => {
-  if (!vaultJsonId) return [];
-  try {
-    const targetUrl = nodeUrl || GAS_WEB_APP_URL;
-    if (!targetUrl) return [];
-    const finalUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getFileContent&fileId=${vaultJsonId}`;
-    const response = await fetch(finalUrl);
-    const result = await response.json();
-    return result.status === 'success' ? JSON.parse(result.content) : [];
-  } catch (e) {
-    return [];
-  }
-};
-
-/**
- * SHARDING: Update Vault JSON Content on Storage Node
- */
-export const updateVaultContent = async (
-  activityId: string, 
-  vaultJsonId: string, 
-  content: ActivityVaultItem[], 
-  nodeUrl?: string
-): Promise<{ success: boolean, newVaultId?: string, newNodeUrl?: string }> => {
-  try {
-    let targetUrl = nodeUrl || GAS_WEB_APP_URL!;
-    
-    // If we don't have a vault yet, ask the backend for a sharding target first
-    if (!vaultJsonId && !nodeUrl) {
-      const quotaRes = await fetch(`${GAS_WEB_APP_URL}?action=checkQuota`);
-      // Quota management is handled on GAS side via action: 'saveJsonFile' logic 
-      // but we ensure we are hitting the master first to let it decide if it needs to proxy.
-    }
-
-    const res = await fetch(targetUrl, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        action: 'saveJsonFile', 
-        fileId: vaultJsonId, 
-        fileName: `vault_${activityId}.json`,
-        content: JSON.stringify(content) 
-      })
-    });
-    const result = await res.json();
-    return { 
-      success: result.status === 'success', 
-      newVaultId: result.fileId,
-      newNodeUrl: targetUrl 
-    };
-  } catch (e) {
-    return { success: false };
   }
 };
 
