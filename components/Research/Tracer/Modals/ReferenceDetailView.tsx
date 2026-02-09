@@ -108,7 +108,6 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
   const [showCite, setShowCite] = useState(false);
   const [content, setContent] = useState<TracerReferenceContent>({ quotes: [] });
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingContent, setIsLoadingContent] = useState(false); // FOR INLINE SKELETON
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [openLangMenu, setOpenLangMenu] = useState<string | null>(null);
 
@@ -121,35 +120,22 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
   ];
 
   useEffect(() => {
-    const loadContent = async () => {
-      // ONLY LOAD IF JSON ID EXISTS
-      if (localRefRow.contentJsonId) {
-        setIsLoadingContent(true);
-        try {
-          const data = await fetchReferenceContent(localRefRow.contentJsonId, localRefRow.storageNodeUrl);
-          if (data) setContent(data);
-        } catch (e) {
-          console.error("Failed to fetch quotes", e);
-        } finally {
-          setIsLoadingContent(false);
-        }
-      }
-      setIsLoading(false);
-    };
-    loadContent();
-  }, [localRefRow.contentJsonId, localRefRow.storageNodeUrl]);
+    // Only set content if available, no need for async fetch as JSONB is in memory
+    if (localRefRow.quotes_data) {
+      setContent(localRefRow.quotes_data);
+    }
+    setIsLoading(false);
+  }, [localRefRow]);
 
   const handleSaveContent = async (newContent: TracerReferenceContent) => {
     // Sync UI first
     setContent(newContent);
     // Background Sync with current metadata
     const result = await saveReferenceContent(localRefRow, newContent);
-    if (result) {
-        // ESSENTIAL: Update localRefRow with newly assigned IDs if this was first write
+    if (result && result.quotes_data) {
         setLocalRefRow(prev => ({
             ...prev,
-            contentJsonId: result.contentJsonId,
-            storageNodeUrl: result.storageNodeUrl
+            quotes_data: result.quotes_data
         }));
     }
   };
@@ -289,7 +275,7 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
                </div>
 
                <div className="space-y-4">
-                  {(isLoading || isLoadingContent) ? (
+                  {isLoading ? (
                     /* INLINE SKELETON LOADING AREA */
                     <div className="space-y-4">
                       {[1,2].map(i => (
@@ -355,7 +341,7 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
                              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2"><Quote size={12}/> Verbatim Source</span>
                              <button onClick={() => handleCopy(quote.originalText)} className="text-[8px] font-black text-[#004A74] uppercase hover:underline">Copy Verbatim</button>
                           </div>
-                          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-[11px] font-bold italic text-gray-500 leading-relaxed">
+                          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-[10px] font-bold italic text-gray-400 leading-relaxed">
                              "{quote.originalText}"
                           </div>
                           <div className="flex items-center justify-between pt-2">

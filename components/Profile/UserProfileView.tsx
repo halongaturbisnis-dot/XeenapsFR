@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+// @ts-ignore
 import { useNavigate } from 'react-router-dom';
 import { UserProfile, EducationEntry, CareerEntry } from '../../types';
 import { 
@@ -45,7 +46,7 @@ const ProfileSkeleton: React.FC = () => (
     <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 pb-32">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
         <div className="h-[600px] skeleton rounded-[3rem]" />
-        <div className="h-[600px] skeleton rounded-[3rem]" />
+        <div className="h-600px] skeleton rounded-[3rem]" />
       </div>
       <div className="h-32 skeleton rounded-[2.5rem]" />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">

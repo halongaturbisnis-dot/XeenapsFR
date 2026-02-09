@@ -37,7 +37,7 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
   const [isCredit, setIsCredit] = useState(item ? (item.credit > 0) : true);
   const [amountStr, setAmountStr] = useState(item ? (item.credit || item.debit).toString() : '0');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingContent, setIsLoadingContent] = useState(!!item?.attachmentsJsonId);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // New state to track uploads in progress
@@ -58,7 +58,6 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
     debit: 0,
     balance: 0,
     description: '',
-    attachmentsJsonId: '',
     storageNodeUrl: '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -69,13 +68,8 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
   const [newlyUploadedFiles, setNewlyUploadedFiles] = useState<{fileId: string, nodeUrl: string}[]>([]);
 
   useEffect(() => {
-    if (item?.attachmentsJsonId) {
-      const load = async () => {
-        const data = await fetchFileContent(item.attachmentsJsonId, item.storageNodeUrl);
-        if (data) setContent(data);
-        setIsLoadingContent(false);
-      };
-      load();
+    if (item?.attachments_data) {
+       setContent(item.attachments_data);
     }
   }, [item]);
 
@@ -172,6 +166,7 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
       date: cleanDateStr, // Use clean local string
       credit: isCredit ? amount : 0,
       debit: !isCredit ? amount : 0,
+      attachments_data: content, // Update content directly
       updatedAt: new Date().toISOString()
     };
 

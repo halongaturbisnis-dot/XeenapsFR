@@ -1,5 +1,5 @@
 
-import { TracerProject, TracerLog, TracerReference, TracerReferenceContent, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse } from '../types';
+import { TracerProject, TracerLog, TracerLogContent, TracerReference, TracerReferenceContent, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse } from '../types';
 import { GAS_WEB_APP_URL } from '../constants';
 import { 
   fetchTracerProjectsFromSupabase, 
@@ -57,7 +57,7 @@ export const fetchTracerLogs = async (projectId: string): Promise<TracerLog[]> =
   return await fetchTracerLogsFromSupabase(projectId);
 };
 
-export const saveTracerLog = async (item: TracerLog, content: { description: string }): Promise<boolean> => {
+export const saveTracerLog = async (item: TracerLog, content: TracerLogContent): Promise<boolean> => {
   try {
     const updatedItem = {
       ...item,
