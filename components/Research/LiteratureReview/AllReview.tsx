@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 // @ts-ignore
 import { useNavigate } from 'react-router-dom';
@@ -135,7 +136,7 @@ const AllReview: React.FC = () => {
         id,
         label: label.toUpperCase(),
         centralQuestion: '',
-        matrix_data: { matrix: [], finalSynthesis: '' },
+        reviewJsonId: '',
         storageNodeUrl: '',
         isFavorite: false,
         createdAt: new Date().toISOString(),

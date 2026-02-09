@@ -85,7 +85,11 @@ const ConsultationGallery: React.FC<ConsultationGalleryProps> = ({ collection, o
           setItems,
           [item.id],
           async (id) => {
-              // Metadata Cleanup (Supabase)
+              // 1. Physical File Cleanup (GAS)
+              if (item.answerJsonId && item.nodeUrl) {
+                 await deleteRemoteFile(item.answerJsonId, item.nodeUrl);
+              }
+              // 2. Metadata Cleanup (Supabase)
               return await deleteConsultation(id);
           },
           () => {
@@ -116,6 +120,10 @@ const ConsultationGallery: React.FC<ConsultationGalleryProps> = ({ collection, o
           setItems,
           idsToDelete,
           async (id) => {
+             const item = itemsToDelete.find(i => i.id === id);
+             if (item && item.answerJsonId && item.nodeUrl) {
+                await deleteRemoteFile(item.answerJsonId, item.nodeUrl);
+             }
              return await deleteConsultation(id);
           },
           () => {
@@ -128,7 +136,7 @@ const ConsultationGallery: React.FC<ConsultationGalleryProps> = ({ collection, o
 
   const handleOpenConsult = (item: ConsultationItem) => {
     setSelectedConsult(item);
-    setActiveAnswer(item.answer_data);
+    setActiveAnswer(null);
     setView('result');
   };
 

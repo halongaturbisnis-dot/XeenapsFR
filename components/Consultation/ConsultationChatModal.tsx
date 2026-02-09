@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ConsultationItem, LibraryItem, ConsultationAnswerContent } from '../../types';
 import { callAiConsult, saveConsultation } from '../../services/ConsultationService';
@@ -35,10 +36,15 @@ const ConsultationChatModal: React.FC<ConsultationChatModalProps> = ({ collectio
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // If we have existing data in JSONB, use it directly
-    if (existingConsult?.answer_data) {
-      setAnswerContent(existingConsult.answer_data);
-    }
+    const loadStoredAnswer = async () => {
+      if (existingConsult?.answerJsonId) {
+        setIsFetchingAnswer(true);
+        const data = await fetchFileContent(existingConsult.answerJsonId, existingConsult.nodeUrl);
+        if (data) setAnswerContent(data);
+        setIsFetchingAnswer(false);
+      }
+    };
+    loadStoredAnswer();
   }, [existingConsult]);
 
   useEffect(() => {
@@ -62,7 +68,7 @@ const ConsultationChatModal: React.FC<ConsultationChatModalProps> = ({ collectio
           id: existingConsult?.id || crypto.randomUUID(),
           collectionId: collection.id,
           question: question,
-          answer_data: result,
+          answerJsonId: existingConsult?.answerJsonId || '',
           nodeUrl: existingConsult?.nodeUrl || '',
           isFavorite: isFavorite,
           createdAt: existingConsult?.createdAt || new Date().toISOString(),
@@ -111,6 +117,7 @@ const ConsultationChatModal: React.FC<ConsultationChatModalProps> = ({ collectio
               <button onClick={toggleFavorite} className="p-2 hover:scale-125 transition-transform">
                 {isFavorite ? <StarSolid className="w-6 h-6 text-[#FED400]" /> : <StarIcon className="w-6 h-6 text-gray-300" />}
               </button>
+              {/* Fix: Removed invalid onClose prop from button element */}
               <button className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all" onClick={onClose}>
                  <XMarkIcon className="w-8 h-8" />
               </button>

@@ -83,14 +83,14 @@ const RichEditor: React.FC<{ value: string; onChange: (v: string) => void; disab
 };
 
 const TracerLogModal: React.FC<TracerLogModalProps> = ({ projectId, log, initialContent, onClose, onSave, onDelete }) => {
-  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [isLoadingContent, setIsLoadingContent] = useState(!!log && !initialContent);
   const [formData, setFormData] = useState<TracerLog>(log || {
     id: crypto.randomUUID(),
     projectId,
     date: new Date().toISOString().split('T')[0],
     title: '',
+    logJsonId: '',
     storageNodeUrl: '',
-    log_data: { description: '', attachments: [] },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
@@ -112,8 +112,18 @@ const TracerLogModal: React.FC<TracerLogModalProps> = ({ projectId, log, initial
   const [activeUploads, setActiveUploads] = useState(0);
 
   useEffect(() => {
-    if (log?.log_data && !initialContent) {
-       setContent(log.log_data);
+    if (log?.logJsonId && !initialContent) {
+      const load = async () => {
+        const data = await fetchFileContent(log.logJsonId, log.storageNodeUrl);
+        if (data) {
+          setContent({
+            description: data.description || '',
+            attachments: Array.isArray(data.attachments) ? data.attachments : []
+          });
+        }
+        setIsLoadingContent(false);
+      };
+      load();
     }
   }, [log, initialContent]);
 

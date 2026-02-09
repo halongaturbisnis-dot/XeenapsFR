@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 // @ts-ignore
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ReviewItem, ReviewContent, ReviewMatrixRow, LibraryItem } from '../../../types';
-import { fetchReviewsPaginated, saveReview, deleteReview, runMatrixExtraction, runReviewSynthesis, translateReviewRowContent } from '../../../services/ReviewService';
+/* Added missing deleteReview import from ReviewService */
+import { fetchReviewsPaginated, fetchReviewContent, saveReview, deleteReview, runMatrixExtraction, runReviewSynthesis, translateReviewRowContent } from '../../../services/ReviewService';
 import { 
   ArrowLeft, 
   Sparkles, 
@@ -12,21 +13,24 @@ import {
   Loader2, 
   BookOpen, 
   MessageSquare,
+  Zap,
+  CheckCircle2,
+  ChevronRight,
   ShieldAlert,
+  ClipboardList,
   Eye,
   Star,
   RefreshCcw,
   Languages,
+  Globe,
   Check,
   X
 } from 'lucide-react';
 import ReviewSourceSelectorModal from './ReviewSourceSelectorModal';
 import { showXeenapsToast } from '../../../utils/toastUtils';
 import { showXeenapsDeleteConfirm } from '../../../utils/confirmUtils';
+import { fetchFileContent } from '../../../services/gasService';
 import LibraryDetailView from '../../Library/LibraryDetailView';
-import { GlobalSavingOverlay } from '../../Common/LoadingComponents';
-import Swal from 'sweetalert2';
-import { XEENAPS_SWAL_CONFIG } from '../../../utils/swalUtils';
 
 const LANG_OPTIONS = [
   { label: "English", code: "en" },
@@ -59,6 +63,7 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
   // INITIALIZE FROM STATE (INSTANT ACCESS)
   const [review, setReview] = useState<ReviewItem | null>(() => (location.state as any)?.review || null);
   const [content, setContent] = useState<ReviewContent>({ matrix: [], finalSynthesis: '' });
+  // FIX: Force isLoading to true by default to prevent premature rendering of empty state
   const [isLoading, setIsLoading] = useState(true);
   const [isHydrated, setIsHydrated] = useState(false); 
   const [isBusy, setIsBusy] = useState(false);
@@ -79,19 +84,21 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
   useEffect(() => {
     const load = async () => {
       try {
-        if (review && review.id === id && isHydrated) return; // Already loaded
-
+        // Fetch latest metadata from Cloud in background
         const res = await fetchReviewsPaginated(1, 1000);
         const found = res.items.find(i => i.id === id);
         
         if (found) {
           setReview(prev => prev ? { ...prev, ...found } : found);
+          // Sync local question state on load
           setLocalQuestion(found.centralQuestion || '');
           
-          if (found.matrix_data) {
-             setContent(found.matrix_data);
-             lastKnownGoodContent.current = found.matrix_data;
+          const detail = await fetchReviewContent(found.reviewJsonId, found.storageNodeUrl);
+          if (detail) {
+            setContent(detail);
+            lastKnownGoodContent.current = detail;
           }
+          // FIX: Only set isHydrated to true AFTER content is successfully fetched
           setIsHydrated(true);
         } else if (!review) {
           navigate('/research/literature-review');
@@ -99,31 +106,40 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
       } catch (error) {
         console.error("Critical error during review data load:", error);
       } finally {
+        // FIX: Always set isLoading to false at the very end of the process
         setIsLoading(false);
       }
     };
     load();
   }, [id]);
 
-  // --- EXTERNAL SYNC LISTENER ---
+  // --- EXTERNAL SYNC LISTENER (Point #2 & #5 Fix) ---
   useEffect(() => {
     const handleRemoteUpdate = (e: any) => {
       const updated = e.detail as ReviewItem;
       if (updated.id === id) {
         setReview(prev => prev ? { ...prev, ...updated } : updated);
+        // Optional: Sync local question if external update happens? 
+        // For now, prioritize local user edits to avoid overwriting typing.
       }
     };
     window.addEventListener('xeenaps-review-updated', handleRemoteUpdate);
     return () => window.removeEventListener('xeenaps-review-updated', handleRemoteUpdate);
   }, [id]);
 
-  // AUTO-SAVE ENGINE
+  // AUTO-SAVE ENGINE (Excluding Central Question which uses manual trigger)
   useEffect(() => {
+    // CRITICAL GUARD: Never save if still loading, not hydrated, or busy
     if (!review || isLoading || !isHydrated || isBusy) return;
-    if (content.matrix.length === 0 && lastKnownGoodContent.current && lastKnownGoodContent.current.matrix.length > 0) return;
+
+    // DATA INTEGRITY GUARD: Prevent saving empty content if we know we should have data
+    if (content.matrix.length === 0 && lastKnownGoodContent.current && lastKnownGoodContent.current.matrix.length > 0) {
+      return;
+    }
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
+      // Only auto-save if review matches local question to avoid overwriting unsaved question drafts
       if (review.centralQuestion === localQuestion) {
          const success = await saveReview(review, content);
          if (success) {
@@ -132,19 +148,26 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
       }
     }, 2000);
     return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
-  }, [content, review, isLoading, isHydrated, isBusy]);
+  }, [review?.label, review?.isFavorite, content, isLoading, isHydrated, isBusy]); // Removed review.centralQuestion from auto-save dep
 
   const handleToggleFavorite = async () => {
     if (!review || isBusy) return;
     const updated = { ...review, isFavorite: !review.isFavorite, updatedAt: new Date().toISOString() };
+    
+    // 1. Instant UI & Local State Update
     setReview(updated);
+    
+    // 2. Immediate Global Broadcast & Cloud Sync
     await saveReview(updated, content);
   };
 
+  // --- NEW: Handle Question Logic ---
   const handleSaveQuestion = async () => {
     if (!review) return;
     const updatedReview = { ...review, centralQuestion: localQuestion, updatedAt: new Date().toISOString() };
     setReview(updatedReview);
+    
+    // Explicitly call save to ensure immediate persistence
     await saveReview(updatedReview, content);
     showXeenapsToast('success', 'Review question updated');
   };
@@ -175,33 +198,31 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
     setAnalyzingIds(prev => [...prev, ...selectedLibs.map(l => l.id)]);
     setContent(prev => ({ ...prev, matrix: [...prev.matrix, ...placeholders] }));
     
-    // Non-blocking loop
-    (async () => {
-        for (const lib of selectedLibs) {
-            try {
-                const result = await runMatrixExtraction(lib.id, review.centralQuestion);
-                if (result) {
-                const completedRow = {
-                    collectionId: lib.id,
-                    title: lib.title,
-                    answer: result.answer,
-                    verbatim: result.verbatim
-                };
-                
-                setContent(prev => ({
-                    ...prev,
-                    matrix: prev.matrix.map(m => m.collectionId === lib.id ? completedRow : m)
-                }));
-                }
-            } catch (e) {
-                showXeenapsToast('error', `Analysis failed for: ${lib.title}`);
-            } finally {
-                setAnalyzingIds(prev => prev.filter(id => id !== lib.id));
-            }
+    for (const lib of selectedLibs) {
+      try {
+        const result = await runMatrixExtraction(lib.id, review.centralQuestion);
+        if (result) {
+          const completedRow = {
+            collectionId: lib.id,
+            title: lib.title,
+            answer: result.answer,
+            verbatim: result.verbatim
+          };
+          
+          setContent(prev => ({
+            ...prev,
+            matrix: prev.matrix.map(m => m.collectionId === lib.id ? completedRow : m)
+          }));
         }
-        setIsBusy(false);
-        showXeenapsToast('success', 'Matrix segments updated');
-    })();
+      } catch (e) {
+        showXeenapsToast('error', `Analysis failed for: ${lib.title}`);
+      } finally {
+        setAnalyzingIds(prev => prev.filter(id => id !== lib.id));
+      }
+    }
+
+    setIsBusy(false);
+    showXeenapsToast('success', 'Matrix segments updated');
   };
 
   const handleSynthesize = async () => {
@@ -212,17 +233,12 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
     setIsBusy(true);
     showXeenapsToast('info', 'Synthesizing global summary...');
     
-    try {
-        const result = await runReviewSynthesis(content.matrix, review!.centralQuestion);
-        if (result) {
-        setContent(prev => ({ ...prev, finalSynthesis: result }));
-        showXeenapsToast('success', 'Synthesis Complete');
-        }
-    } catch(e) {
-        showXeenapsToast('error', 'Synthesis Failed');
-    } finally {
-        setIsBusy(false);
+    const result = await runReviewSynthesis(content.matrix, review!.centralQuestion);
+    if (result) {
+      setContent(prev => ({ ...prev, finalSynthesis: result }));
+      showXeenapsToast('success', 'Synthesis Complete');
     }
+    setIsBusy(false);
   };
 
   const removeRow = async (libId: string) => {
@@ -302,7 +318,6 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#fcfcfc] overflow-hidden relative">
-      <GlobalSavingOverlay isVisible={false} />
       
       {/* HUD HEADER */}
       <header className="px-6 md:px-10 py-5 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between shrink-0 z-50">
@@ -486,7 +501,7 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
                                          <button 
                                             onClick={() => setOpenTranslationMenu(openTranslationMenu === row.collectionId ? null : row.collectionId)}
                                             disabled={!!translatingId || isAnalyzing || !row.answer}
-                                            className={`p-2.5 rounded-xl transition-all shadow-sm ${isTranslating ? 'bg-[#004A74] text-white animate-pulse' : 'bg-gray-50 text-gray-400 hover:text-[#004A74] hover:bg-white'}`}
+                                            className={`p-2.5 rounded-xl transition-all ${isTranslating ? 'bg-[#004A74] text-white animate-pulse' : 'bg-gray-50 text-gray-400 hover:text-[#004A74]'}`}
                                             title="Translate Segment"
                                          >
                                             {isTranslating ? <Loader2 size={16} className="animate-spin" /> : <Languages size={16} />}
@@ -657,6 +672,23 @@ const ReviewDetail: React.FC<ReviewDetailProps> = ({ libraryItems, isMobileSideb
         
         .review-output-body b { font-weight: 900; color: #004A74; }
         .review-output-body p { margin-bottom: 1.5rem; line-height: 1.8; }
+        .review-output-body br { margin-bottom: 0.5rem; content: ""; display: block; }
+        .review-output-body ol { 
+          list-style-type: decimal !important; 
+          margin: 1.5rem 0 1.5rem 1.5rem !important; 
+          padding-left: 0.5rem !important;
+        }
+        .review-output-body ul { 
+          list-style-type: disc !important; 
+          margin: 1.5rem 0 1.5rem 1.5rem !important; 
+          padding-left: 0.5rem !important;
+        }
+        .review-output-body li { 
+          margin-bottom: 0.75rem !important; 
+          font-weight: 600; 
+          display: list-item !important;
+          padding-left: 0.5rem;
+        }
       `}</style>
     </div>
   );

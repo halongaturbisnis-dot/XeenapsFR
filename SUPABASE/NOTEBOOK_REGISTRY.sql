@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS public.notes (
     "label" TEXT NOT NULL,
     "searchIndex" TEXT, -- Teks gabungan dari konten untuk pencarian
     "noteJsonId" TEXT,  -- ID File fisik di Google Drive
-    "content_data" JSONB DEFAULT '{}'::jsonb, -- Hybrid Storage: HTML Content & Attachments
     "storageNodeUrl" TEXT, -- URL Worker GAS yang menyimpan file
     "isFavorite" BOOLEAN DEFAULT false,
     "isUsed" BOOLEAN DEFAULT false,
@@ -27,9 +26,6 @@ ALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;
 
 -- Kebijakan Akses Publik (Read/Write)
 CREATE POLICY "Public Access Notes" ON public.notes FOR ALL USING (true);
-
--- Update Schema for Hybrid Storage (Safe Migration)
-ALTER TABLE public.notes ADD COLUMN IF NOT EXISTS "content_data" JSONB DEFAULT '{}'::jsonb;
 
 -- Fungsi Trigger untuk update otomatis search_all
 -- Menggabungkan Label, Judul Koleksi, dan SearchIndex (konten ringkas)

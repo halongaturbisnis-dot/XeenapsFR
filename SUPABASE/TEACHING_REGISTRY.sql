@@ -56,7 +56,6 @@ CREATE TABLE IF NOT EXISTS public.teaching_logs (
 
     -- System
     "vaultJsonId" TEXT, -- File fisik di Drive (via GAS)
-    "vault_data" JSONB DEFAULT '[]'::jsonb, -- Hybrid Storage: Direct Attachment List
     "storageNodeUrl" TEXT, -- Worker URL
     "status" TEXT DEFAULT 'Planned',
     "createdAt" TIMESTAMPTZ DEFAULT now(),
@@ -72,9 +71,6 @@ CREATE INDEX IF NOT EXISTS idx_teaching_logs_created_at ON public.teaching_logs 
 -- RLS
 ALTER TABLE public.teaching_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Access Teaching Logs" ON public.teaching_logs FOR ALL USING (true);
-
--- Update Schema for Hybrid Storage (Safe Migration)
-ALTER TABLE public.teaching_logs ADD COLUMN IF NOT EXISTS "vault_data" JSONB DEFAULT '[]'::jsonb;
 
 -- Trigger Search Index
 CREATE OR REPLACE FUNCTION public.update_teaching_search_index()

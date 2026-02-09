@@ -70,31 +70,32 @@ const DocumentationVault: React.FC = () => {
 
   useEffect(() => {
     const loadVault = async () => {
-      if (!metadata) return;
+      if (!metadata?.vaultJsonId) return;
       setIsLoading(true);
-      // Directly use vault_data from metadata
-      setItems(metadata.vault_data || []);
+      const content = await fetchVaultContent(metadata.vaultJsonId, metadata.storageNodeUrl);
+      setItems(content);
       setIsLoading(false);
     };
     loadVault();
-  }, [metadata]);
+  }, [metadata?.vaultJsonId, metadata?.storageNodeUrl]);
 
   const handleSyncVault = async (newItems: ActivityVaultItem[]) => {
     if (!metadata || !urlActivityId) return;
     
-    // 1. Sync via Update (Hybrid Storage)
-    const success = await updateVaultContent(metadata, newItems);
+    // 1. Sync JSON file to the Shard Node
+    const result = await updateVaultContent(urlActivityId, metadata.vaultJsonId, newItems, metadata.storageNodeUrl);
     
-    if (success) {
-      // 2. Update local state
+    if (result.success) {
+      // 2. IMPORTANT: Update the Master Registry with the new Vault ID and Storage Node
       const updatedMetadata: ActivityItem = { 
         ...metadata, 
-        vault_data: newItems,
+        vaultJsonId: result.newVaultId || metadata.vaultJsonId,
+        storageNodeUrl: result.newNodeUrl || metadata.storageNodeUrl,
         updatedAt: new Date().toISOString()
       };
       
       setMetadata(updatedMetadata);
-      setItems(newItems);
+      await saveActivity(updatedMetadata); // SYNC TO MAIN SPREADSHEET
     }
   };
 
@@ -412,8 +413,8 @@ const DocumentationVault: React.FC = () => {
                           <input type="url" className="w-full bg-white border border-gray-100 px-3 py-2 rounded-lg text-[11px] font-bold text-blue-500" value={l.url} placeholder="https://..." onChange={e => setLinkQueue(prev => prev.map((item, idx) => idx === i ? {...item, url: e.target.value} : item))} />
                        </div>
                        <div className="space-y-1.5">
-                          <label className="text-[8px] font-black uppercase text-gray-400">Label</label>
-                          <input className="w-full bg-white border border-gray-100 px-3 py-2 rounded-lg text-[11px] font-bold text-[#004A74]" value={l.label} placeholder="Custom Name" onChange={e => setLinkQueue(prev => prev.map((item, idx) => idx === i ? {...item, label: e.target.value} : item))} />
+                          <label className="text-[8px] font-black uppercase text-gray-400">Link Label</label>
+                          <input className="w-full bg-white border border-gray-100 px-3 py-2 rounded-lg text-[11px] font-bold text-[#004A74]" value={l.label} placeholder="Custom label" onChange={e => setLinkQueue(prev => prev.map((item, idx) => idx === i ? {...item, label: e.target.value} : item))} />
                        </div>
                        {linkQueue.length > 1 && (
                           <button onClick={() => setLinkQueue(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-all"><X size={12} /></button>

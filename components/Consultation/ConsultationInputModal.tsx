@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { LibraryItem, ConsultationItem, ConsultationAnswerContent } from '../../types';
 import { callAiConsult, saveConsultation } from '../../services/ConsultationService';
@@ -33,7 +34,7 @@ const ConsultationInputModal: React.FC<ConsultationInputModalProps> = ({ collect
           id: crypto.randomUUID(),
           collectionId: collection.id,
           question: question,
-          answer_data: result,
+          answerJsonId: '',
           nodeUrl: '',
           isFavorite: false,
           createdAt: new Date().toISOString(),

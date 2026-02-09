@@ -1,5 +1,5 @@
 
-import { TracerProject, TracerLog, TracerLogContent, TracerReference, TracerReferenceContent, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse } from '../types';
+import { TracerProject, TracerLog, TracerReference, TracerReferenceContent, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse } from '../types';
 import { GAS_WEB_APP_URL } from '../constants';
 import { 
   fetchTracerProjectsFromSupabase, 
@@ -18,13 +18,13 @@ import {
   upsertTracerFinanceToSupabase,
   deleteTracerFinanceFromSupabase
 } from './TracerSupabaseService';
-import { deleteRemoteFile } from './ActivityService';
+import { deleteRemoteFile, fetchVaultContent } from './ActivityService';
 import { fetchFileContent } from './gasService';
 
 /**
  * XEENAPS TRACER SERVICE (HYBRID ARCHITECTURE)
- * Metadata & Structured Data: Supabase (JSONB)
- * Binary Files: GAS (Drive)
+ * Metadata: Supabase
+ * Payload: Google Apps Script (Sharding)
  */
 
 // --- 1. PROJECTS ---
@@ -53,18 +53,40 @@ export const deleteTracerProject = async (id: string): Promise<boolean> => {
 // --- 2. LOGS ---
 
 export const fetchTracerLogs = async (projectId: string): Promise<TracerLog[]> => {
-  // Data (log_data) is included in the fetch
   return await fetchTracerLogsFromSupabase(projectId);
 };
 
-export const saveTracerLog = async (item: TracerLog, content: TracerLogContent): Promise<boolean> => {
+export const saveTracerLog = async (item: TracerLog, content: { description: string }): Promise<boolean> => {
+  if (!GAS_WEB_APP_URL) return false;
+  
   try {
-    const updatedItem = {
-      ...item,
-      log_data: content, // Save directly to JSONB
-      updatedAt: new Date().toISOString()
-    };
+    let updatedItem = { ...item };
+
+    // 1. Sharding Content to GAS
+    if (content) {
+      const res = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          action: 'saveJsonFile', // Generic GAS action
+          fileId: item.logJsonId || null,
+          fileName: `tracer_log_${item.id}.json`,
+          content: JSON.stringify(content),
+          folderId: null // Uses default folder
+        })
+      });
+      const result = await res.json();
+      
+      if (result.status === 'success') {
+        updatedItem.logJsonId = result.fileId;
+        updatedItem.storageNodeUrl = result.nodeUrl || GAS_WEB_APP_URL; // Update Node URL
+      } else {
+        throw new Error("Failed to save log content to drive.");
+      }
+    }
+
+    // 2. Save Metadata to Supabase
     return await upsertTracerLogToSupabase(updatedItem);
+
   } catch (e) {
     console.error("Save Tracer Log Failed:", e);
     return false;
@@ -72,6 +94,8 @@ export const saveTracerLog = async (item: TracerLog, content: TracerLogContent):
 };
 
 export const deleteTracerLog = async (id: string): Promise<boolean> => {
+  // Optional: Fetch item to clean up file if ID known. 
+  // For now, metadata deletion is prioritized.
   return await deleteTracerLogFromSupabase(id);
 };
 
@@ -87,9 +111,8 @@ export const linkTracerReference = async (item: Partial<TracerReference>): Promi
       id: item.id || crypto.randomUUID(),
       projectId: item.projectId || '',
       collectionId: item.collectionId || '',
-      // quotes_data initialized empty
-      quotes_data: { quotes: [] },
-      storageNodeUrl: '', // Not needed for JSONB
+      contentJsonId: '',
+      storageNodeUrl: '',
       createdAt: new Date().toISOString()
     };
     
@@ -104,18 +127,51 @@ export const unlinkTracerReference = async (id: string): Promise<boolean> => {
   return await deleteTracerReferenceFromSupabase(id);
 };
 
-export const fetchReferenceContent = async (item: TracerReference): Promise<TracerReferenceContent | null> => {
-  return item.quotes_data || { quotes: [] };
+/**
+ * SHARDING: Reference Content (Quotes)
+ */
+export const fetchReferenceContent = async (contentJsonId: string, nodeUrl?: string): Promise<TracerReferenceContent | null> => {
+  if (!contentJsonId) return null;
+  try {
+    const targetUrl = nodeUrl || GAS_WEB_APP_URL;
+    if (!targetUrl) return null;
+    const finalUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getFileContent&fileId=${contentJsonId}`;
+    const response = await fetch(finalUrl);
+    const result = await response.json();
+    return result.status === 'success' ? JSON.parse(result.content) : null;
+  } catch (e) {
+    return null;
+  }
 };
 
-export const saveReferenceContent = async (item: TracerReference, content: TracerReferenceContent): Promise<{quotes_data: TracerReferenceContent} | null> => {
+export const saveReferenceContent = async (item: TracerReference, content: TracerReferenceContent): Promise<{contentJsonId: string, storageNodeUrl: string} | null> => {
+  if (!GAS_WEB_APP_URL) return null;
+  
   try {
-    const updatedItem = {
-      ...item,
-      quotes_data: content
-    };
-    await upsertTracerReferenceToSupabase(updatedItem);
-    return { quotes_data: content };
+    // 1. Sharding Content
+    const res = await fetch(GAS_WEB_APP_URL, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        action: 'saveJsonFile', 
+        fileId: item.contentJsonId || null,
+        fileName: `ref_content_${item.id}.json`,
+        content: JSON.stringify(content)
+      })
+    });
+    const result = await res.json();
+    
+    if (result.status === 'success') {
+       // 2. Update Metadata Registry
+       const updatedItem = {
+         ...item,
+         contentJsonId: result.fileId,
+         storageNodeUrl: result.nodeUrl || GAS_WEB_APP_URL
+       };
+       await upsertTracerReferenceToSupabase(updatedItem);
+       
+       return { contentJsonId: result.fileId, storageNodeUrl: updatedItem.storageNodeUrl };
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -147,7 +203,11 @@ export const fetchTracerFinance = async (projectId: string, startDate = "", endD
 
 /**
  * EXPORT PDF LOGIC (Hybrid Stitching)
- * Updated to use attachments_data from JSONB
+ * 1. Fetch metadata from Supabase
+ * 2. Calculate Running Balance
+ * 3. Fetch attachments info (sharded JSON)
+ * 4. Construct payload
+ * 5. POST payload to GAS PDF Engine
  */
 export const exportFinanceLedger = async (projectId: string, currency: string): Promise<{ base64: string, filename: string } | null> => {
   if (!GAS_WEB_APP_URL) return null;
@@ -157,6 +217,7 @@ export const exportFinanceLedger = async (projectId: string, currency: string): 
      if (financeItems.length === 0) return null;
 
      // 2. Calculate Running Balance for Export
+     // Ensure items are sorted chronologically before calculating
      const sortedItems = [...financeItems].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
      let runningBalance = 0;
      const calculatedItems = sortedItems.map(item => {
@@ -170,17 +231,22 @@ export const exportFinanceLedger = async (projectId: string, currency: string): 
      const projectTitle = project?.title || project?.label || "Financial Report";
      const projectAuthors = Array.isArray(project?.authors) ? project.authors.join(", ") : "Xeenaps User";
 
-     // 4. Enrich Items with Attachment Links (From JSONB)
-     const enrichedTransactions = calculatedItems.map(item => {
+     // 4. Enrich Items with Attachment Links (Async Batch)
+     const enrichedTransactions = await Promise.all(calculatedItems.map(async (item) => {
         let linkString = "-";
-        if (item.attachments_data && Array.isArray(item.attachments_data.attachments)) {
-           const urls = item.attachments_data.attachments.map((a: any) => 
-              a.url || (a.fileId ? `https://drive.google.com/file/d/${a.fileId}/view` : "")
-           ).filter((u: string) => u !== "");
-           if (urls.length > 0) linkString = urls.join(" | ");
+        if (item.attachmentsJsonId) {
+           try {
+              const content = await fetchFileContent(item.attachmentsJsonId, item.storageNodeUrl);
+              if (content && Array.isArray(content.attachments)) {
+                 const urls = content.attachments.map((a: any) => 
+                    a.url || (a.fileId ? `https://drive.google.com/file/d/${a.fileId}/view` : "")
+                 ).filter((u: string) => u !== "");
+                 if (urls.length > 0) linkString = urls.join(" | ");
+              }
+           } catch (e) { console.warn("Failed to fetch attachment for export", e); }
         }
         return { ...item, links: linkString };
-     });
+     }));
 
      // 5. Construct Payload
      const payload = {
@@ -190,7 +256,7 @@ export const exportFinanceLedger = async (projectId: string, currency: string): 
         currency
      };
 
-     // 6. Send to GAS (PDF Engine)
+     // 6. Send to GAS
      const res = await fetch(GAS_WEB_APP_URL, {
         method: 'POST',
         body: JSON.stringify({
@@ -211,12 +277,31 @@ export const exportFinanceLedger = async (projectId: string, currency: string): 
 };
 
 export const saveTracerFinance = async (item: TracerFinanceItem, content: TracerFinanceContent): Promise<boolean> => {
+  if (!GAS_WEB_APP_URL) return false;
+  
   try {
-    const updatedItem = {
-      ...item,
-      attachments_data: content, // Save direct to JSONB
-      updatedAt: new Date().toISOString()
-    };
+    let updatedItem = { ...item };
+
+    // 1. Sharding Content (Attachments)
+    if (content) {
+      const res = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({ 
+          action: 'saveJsonFile', 
+          fileId: item.attachmentsJsonId || null,
+          fileName: `fin_attachments_${item.id}.json`,
+          content: JSON.stringify(content)
+        })
+      });
+      const result = await res.json();
+      
+      if (result.status === 'success') {
+         updatedItem.attachmentsJsonId = result.fileId;
+         updatedItem.storageNodeUrl = result.nodeUrl || GAS_WEB_APP_URL;
+      }
+    }
+
+    // 2. Save Metadata to Supabase
     return await upsertTracerFinanceToSupabase(updatedItem);
   } catch (e) {
     return false;
@@ -224,9 +309,6 @@ export const saveTracerFinance = async (item: TracerFinanceItem, content: Tracer
 };
 
 export const deleteTracerFinance = async (id: string): Promise<GASResponse<any>> => {
-  // Physical file cleanup should be handled if item context is known, 
-  // but assuming deletion from list, we might not have it handy.
-  // Standard protocol: Delete Metadata.
   const success = await deleteTracerFinanceFromSupabase(id);
   return { status: success ? 'success' : 'error' };
 };

@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS public.reviews (
     "label" TEXT NOT NULL,
     "centralQuestion" TEXT,
     "reviewJsonId" TEXT,  -- ID File fisik di Google Drive (Matrix & Synthesis)
-    "matrix_data" JSONB DEFAULT '{"matrix": [], "finalSynthesis": ""}'::jsonb, -- Hybrid Storage: Full Review Data
     "storageNodeUrl" TEXT, -- URL Worker GAS yang menyimpan file
     "isFavorite" BOOLEAN DEFAULT false,
     "createdAt" TIMESTAMPTZ DEFAULT now(),
@@ -24,9 +23,6 @@ ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 
 -- Kebijakan Akses Publik (Read/Write)
 CREATE POLICY "Public Access Reviews" ON public.reviews FOR ALL USING (true);
-
--- Update Schema for Hybrid Storage (Safe Migration)
-ALTER TABLE public.reviews ADD COLUMN IF NOT EXISTS "matrix_data" JSONB DEFAULT '{"matrix": [], "finalSynthesis": ""}'::jsonb;
 
 -- Fungsi Trigger untuk update otomatis search_all
 -- Menggabungkan Label dan Central Question untuk pencarian

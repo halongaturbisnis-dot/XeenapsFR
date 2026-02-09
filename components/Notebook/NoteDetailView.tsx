@@ -39,15 +39,23 @@ const NoteDetailView: React.FC<NoteDetailViewProps> = ({ note, initialContent, o
     const load = async () => {
       setIsLoading(true);
       try {
-        // If content is already embedded in the note (Hybrid Storage)
-        if (note.content_data) {
-           setContent(note.content_data);
-        } else {
-           // Fallback/Safety Net: Fetch from Supabase via Service if needed
-           // Currently fetchNoteContent just returns item.content_data, so redundant but safe
-           const data = await fetchNoteContent(note);
-           setContent(data);
+        let jsonId = note.noteJsonId;
+        let nodeUrl = note.storageNodeUrl;
+
+        // Safety Net: If ID missing (Stale State), fetch from Supabase first
+        if (!jsonId) {
+           const supabase = getSupabase();
+           if (supabase) {
+             const { data } = await supabase.from('notes').select('noteJsonId, storageNodeUrl').eq('id', note.id).single();
+             if (data) {
+                jsonId = data.noteJsonId;
+                nodeUrl = data.storageNodeUrl;
+             }
+           }
         }
+
+        const data = await fetchNoteContent(jsonId, nodeUrl);
+        setContent(data);
       } catch (e) {
         console.error("Failed to fetch note content", e);
       } finally {

@@ -175,7 +175,7 @@ const TeachingDashboard: React.FC = () => {
         assignmentType: AssignmentType.NONE,
         assessmentCriteria: '',
         status: SessionStatus.PLANNED, 
-        vault_data: [],
+        vaultJsonId: '',
         storageNodeUrl: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -481,4 +481,15 @@ const TeachingDashboard: React.FC = () => {
   );
 };
 
-export default TeachingDashboard;
+const TeachingMain: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<TeachingDashboard />} />
+      <Route path="/:sessionId" element={<TeachingDetail />} />
+      <Route path="/:sessionId/vault" element={<TeachingVault />} />
+      <Route path="/:sessionId/questions" element={<AttachedQuestion />} />
+    </Routes>
+  );
+};
+
+export default TeachingMain;

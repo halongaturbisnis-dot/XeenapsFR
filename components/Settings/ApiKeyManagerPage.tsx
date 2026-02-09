@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// @ts-ignore
 import { useNavigate } from 'react-router-dom';
 import { 
   Key, 

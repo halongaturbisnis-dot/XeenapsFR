@@ -62,30 +62,31 @@ const TeachingVault: React.FC = () => {
 
   useEffect(() => {
     const loadVault = async () => {
-      if (!metadata) return;
+      if (!metadata?.vaultJsonId) return;
       setIsLoading(true);
-      // Directly use vault_data
-      setItems(metadata.vault_data || []);
+      const content = await fetchTeachingVaultContent(metadata.vaultJsonId, metadata.storageNodeUrl);
+      setItems(content);
       setIsLoading(false);
     };
     loadVault();
-  }, [metadata]);
+  }, [metadata?.vaultJsonId, metadata?.storageNodeUrl]);
 
   const handleSyncVault = async (newItems: TeachingVaultItem[]) => {
     if (!metadata || !sessionId) return;
     
-    // 1. Sync via Update (Hybrid Storage)
-    const success = await updateTeachingVaultContent(metadata, newItems);
+    // 1. Sync JSON content to GAS Storage
+    const result = await updateTeachingVaultContent(sessionId, metadata.vaultJsonId, newItems, metadata.storageNodeUrl);
     
-    if (success) {
-      // 2. Update local state
+    if (result.success) {
+      // 2. Update Registry Metadata (Supabase)
       const updatedMetadata: TeachingItem = { 
         ...metadata, 
-        vault_data: newItems,
+        vaultJsonId: result.newVaultId || metadata.vaultJsonId,
+        storageNodeUrl: result.newNodeUrl || metadata.storageNodeUrl,
         updatedAt: new Date().toISOString()
       };
       setMetadata(updatedMetadata);
-      setItems(newItems);
+      await saveTeachingItem(updatedMetadata); // This now calls Supabase upsert
     }
   };
 
@@ -297,14 +298,14 @@ const TeachingVault: React.FC = () => {
                  {fileQueue.length === 0 ? (
                     <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-gray-50 cursor-pointer hover:bg-white transition-all group">
                        <PlusCircle className="w-10 h-10 text-gray-300 group-hover:text-[#004A74] mb-3" />
-                       <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Select Documents or Images</p>
+                       <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Select Evidence Files</p>
                        <input type="file" className="hidden" multiple onChange={onFileSelect} />
                     </label>
                  ) : (
                     <div className="space-y-4">
                        {fileQueue.map((q, i) => (
                           <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 animate-in slide-in-from-left-2">
-                             <div className="w-12 h-12 bg-white rounded-xl overflow-hidden border border-gray-100 shrink-0 flex items-center justify-center">
+                             <div className="w-12 h-12 bg-white rounded-xl overflow-hidden shrink-0 flex items-center justify-center border border-gray-100">
                                 {q.previewUrl ? <img src={q.previewUrl} className="w-full h-full object-cover" /> : <FileIcon size={20} className="text-gray-300" />}
                              </div>
                              <input className="flex-1 bg-white border border-gray-100 px-3 py-2 rounded-lg text-[10px] font-bold text-[#004A74]" value={q.label} onChange={e => setFileQueue(prev => prev.map((item, idx) => idx === i ? {...item, label: e.target.value} : item))} />
@@ -331,7 +332,7 @@ const TeachingVault: React.FC = () => {
               <div className="p-8 border-b border-gray-100 flex items-center justify-between shrink-0">
                  <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-[#004A74] text-[#FED400] rounded-2xl flex items-center justify-center shadow-lg"><LinkIcon size={24} /></div>
-                    <h2 className="text-xl font-black text-[#004A74] uppercase tracking-tight">Links Insert</h2>
+                    <h2 className="text-xl font-black text-[#004A74] uppercase tracking-tight">External Links</h2>
                  </div>
                  <button onClick={closeLinkModal} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all"><X size={24} /></button>
               </div>

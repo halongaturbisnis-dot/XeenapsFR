@@ -314,10 +314,15 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
   };
 
   const handleOpenLog = async (log: TracerLog) => {
-    // UPDATED: Use log_data from item (Hybrid Storage)
-    // Fallback to cache if needed, but primary source is the item itself
-    const content = log.log_data || logContentCache[log.id];
-    setLogModal({ open: true, log, cachedContent: content });
+    const cached = logContentCache[log.id];
+    setLogModal({ open: true, log, cachedContent: cached });
+    if (!cached && log.logJsonId) {
+      const data = await fetchFileContent(log.logJsonId, log.storageNodeUrl);
+      if (data) {
+        logContentCache[log.id] = data;
+        setLogModal(prev => prev.log?.id === log.id ? { ...prev, cachedContent: data } : prev);
+      }
+    }
   };
 
   const handleSaveLogItem = async (logItem: TracerLog, content: TracerLogContent) => {

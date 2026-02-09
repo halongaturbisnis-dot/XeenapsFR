@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { LibraryItem, TracerReference } from '../../../../types';
 import { linkTracerReference, unlinkTracerReference } from '../../../../services/TracerService';
@@ -61,8 +60,7 @@ const ReferenceTab: React.FC<ReferenceTabProps> = ({ projectId, libraryItems, re
         id: tempId,
         projectId,
         collectionId: item.id,
-        // Removed contentJsonId as it's no longer used
-        quotes_data: { quotes: [] },
+        contentJsonId: '',
         storageNodeUrl: '',
         createdAt: new Date().toISOString()
       };

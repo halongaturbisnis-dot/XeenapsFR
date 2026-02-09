@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS public.consultations (
     "collectionId" TEXT NOT NULL,
     "question" TEXT NOT NULL,
     "answerJsonId" TEXT,
-    "answer_data" JSONB DEFAULT '{}'::jsonb, -- Hybrid Storage: AI Response & Reasoning
     "nodeUrl" TEXT,
     "isFavorite" BOOLEAN DEFAULT false,
     "createdAt" TIMESTAMPTZ DEFAULT now(),
@@ -23,9 +22,6 @@ ALTER TABLE public.consultations ENABLE ROW LEVEL SECURITY;
 
 -- Kebijakan Akses Publik (Bisa disesuaikan nanti untuk auth user)
 CREATE POLICY "Public Access Consultations" ON public.consultations FOR ALL USING (true);
-
--- Update Schema for Hybrid Storage (Safe Migration)
-ALTER TABLE public.consultations ADD COLUMN IF NOT EXISTS "answer_data" JSONB DEFAULT '{}'::jsonb;
 
 -- Fungsi Trigger untuk update otomatis search_all
 CREATE OR REPLACE FUNCTION public.update_consultation_search_index()

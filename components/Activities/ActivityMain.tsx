@@ -100,7 +100,7 @@ const ActivityDashboard: React.FC = () => {
       credit: '',
       link: '',
       isFavorite: false,
-      vault_data: [],
+      vaultJsonId: '',
       storageNodeUrl: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

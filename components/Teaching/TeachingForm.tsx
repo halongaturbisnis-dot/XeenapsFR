@@ -81,7 +81,7 @@ const TeachingForm: React.FC = () => {
     assignmentType: AssignmentType.NONE,
     assessmentCriteria: '',
     status: SessionStatus.COMPLETED,
-    vault_data: [], 
+    vaultJsonId: '', 
     storageNodeUrl: '', 
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()

@@ -364,7 +364,7 @@ const FinanceTab: React.FC<FinanceTabProps> = ({ projectId }) => {
                            <StandardTd className="px-2 md:px-4 py-2 md:py-4 w-[400px] overflow-hidden text-[9px] md:text-sm">
                               <div className="flex items-center gap-2 min-w-0 w-full">
                                  <span className="font-bold text-gray-600 truncate whitespace-nowrap block flex-1 min-w-0">{item.description}</span>
-                                 {item.attachments_data?.attachments?.length > 0 && <div className="w-1.5 h-1.5 rounded-full bg-[#FED400] shrink-0" />}
+                                 {item.attachmentsJsonId && <div className="w-1.5 h-1.5 rounded-full bg-[#FED400] shrink-0" />}
                               </div>
                            </StandardTd>
                            <StandardTd className="sticky right-0 bg-white group-hover:bg-[#f0f7fa] px-2 md:px-4 py-2 md:py-4">

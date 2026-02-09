@@ -181,8 +181,7 @@ export interface NoteItem {
   collectionId: string; // Opsional: relasi ke library
   collectionTitle?: string; // New: Persistent collection title for backend search
   label: string;
-  // REMOVED: noteJsonId: string;
-  content_data: NoteContent; // Hybrid Storage: JSONB
+  noteJsonId: string; // ID file sharding di Drive
   storageNodeUrl: string;
   searchIndex?: string; // New: Concatenated text (desc + attachments) for backend search
   isFavorite: boolean;
@@ -214,8 +213,7 @@ export interface ReviewItem {
   id: string;
   label: string;
   centralQuestion: string;
-  // REMOVED: reviewJsonId: string;
-  matrix_data: ReviewContent; // Hybrid Storage: JSONB
+  reviewJsonId: string;
   storageNodeUrl: string;
   isFavorite: boolean;
   createdAt: string;
@@ -275,8 +273,7 @@ export interface ActivityItem {
   credit: string;
   link: string;
   isFavorite: boolean;
-  // REMOVED: vaultJsonId: string;
-  vault_data: ActivityVaultItem[]; // Hybrid Storage: JSONB
+  vaultJsonId: string;
   storageNodeUrl: string;
   certificateFileId?: string;
   certificateNodeUrl?: string;
@@ -395,8 +392,7 @@ export interface TeachingItem {
   assessmentCriteria: string;
 
   // System
-  // REMOVED: vaultJsonId: string;
-  vault_data: TeachingVaultItem[]; // Hybrid Storage: JSONB
+  vaultJsonId: string;
   storageNodeUrl: string;
   status: SessionStatus;
   createdAt: string;
@@ -481,8 +477,7 @@ export interface TracerLog {
   projectId: string;
   date: string;
   title: string;
-  // REMOVED: logJsonId: string;
-  log_data: TracerLogContent; // Hybrid Storage: JSONB
+  logJsonId: string; // Sharding ID
   storageNodeUrl: string;
   createdAt: string;
   updatedAt: string;
@@ -520,8 +515,7 @@ export interface TracerReference {
   id: string;
   projectId: string;
   collectionId: string; // Links to LibraryItem
-  // REMOVED: contentJsonId: string;
-  quotes_data: TracerReferenceContent; // Hybrid Storage: JSONB
+  contentJsonId: string; // Sharding ID for quotes
   storageNodeUrl: string; // Sharding node URL
   createdAt: string;
 }
@@ -556,8 +550,7 @@ export interface TracerFinanceItem {
   debit: number;
   balance: number;
   description: string;
-  // REMOVED: attachmentsJsonId: string;
-  attachments_data: TracerFinanceContent; // Hybrid Storage: JSONB
+  attachmentsJsonId: string;
   storageNodeUrl: string;
   createdAt: string;
   updatedAt: string;
@@ -806,8 +799,7 @@ export interface ConsultationItem {
   id: string;
   collectionId: string;
   question: string;
-  // REMOVED: answerJsonId: string;
-  answer_data: ConsultationAnswerContent; // Hybrid Storage: JSONB
+  answerJsonId: string;
   nodeUrl: string;
   isFavorite: boolean;
   createdAt: string;

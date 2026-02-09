@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS public.tracer_logs (
     "date" TEXT,
     "title" TEXT,
     "logJsonId" TEXT, -- File fisik JSON di Drive
-    "log_data" JSONB DEFAULT '{}'::jsonb, -- Hybrid Storage: Log Content
     "storageNodeUrl" TEXT,
     "createdAt" TIMESTAMPTZ DEFAULT now(),
     "updatedAt" TIMESTAMPTZ DEFAULT now()
@@ -43,7 +42,6 @@ CREATE TABLE IF NOT EXISTS public.tracer_references (
     "projectId" TEXT REFERENCES public.tracer_projects("id") ON DELETE CASCADE,
     "collectionId" TEXT NOT NULL,
     "contentJsonId" TEXT, -- File fisik JSON untuk quotes
-    "quotes_data" JSONB DEFAULT '{"quotes": []}'::jsonb, -- Hybrid Storage: Saved Quotes
     "storageNodeUrl" TEXT,
     "createdAt" TIMESTAMPTZ DEFAULT now()
 );
@@ -75,7 +73,6 @@ CREATE TABLE IF NOT EXISTS public.tracer_finance (
     "balance" NUMERIC DEFAULT 0,
     "description" TEXT,
     "attachmentsJsonId" TEXT, -- File fisik JSON untuk bukti
-    "attachments_data" JSONB DEFAULT '{"attachments": []}'::jsonb, -- Hybrid Storage: Evidence List
     "storageNodeUrl" TEXT,
     "createdAt" TIMESTAMPTZ DEFAULT now(),
     "updatedAt" TIMESTAMPTZ DEFAULT now(),
@@ -103,11 +100,6 @@ CREATE POLICY "Public Access Tracer Logs" ON public.tracer_logs FOR ALL USING (t
 CREATE POLICY "Public Access Tracer References" ON public.tracer_references FOR ALL USING (true);
 CREATE POLICY "Public Access Tracer Todos" ON public.tracer_todos FOR ALL USING (true);
 CREATE POLICY "Public Access Tracer Finance" ON public.tracer_finance FOR ALL USING (true);
-
--- Update Schema for Hybrid Storage (Safe Migration)
-ALTER TABLE public.tracer_logs ADD COLUMN IF NOT EXISTS "log_data" JSONB DEFAULT '{}'::jsonb;
-ALTER TABLE public.tracer_references ADD COLUMN IF NOT EXISTS "quotes_data" JSONB DEFAULT '{"quotes": []}'::jsonb;
-ALTER TABLE public.tracer_finance ADD COLUMN IF NOT EXISTS "attachments_data" JSONB DEFAULT '{"attachments": []}'::jsonb;
 
 -- Trigger Search Index (Projects)
 CREATE OR REPLACE FUNCTION public.update_tracer_project_search_index()

@@ -98,7 +98,7 @@ const NoteForm: React.FC<NoteFormProps> = ({ note, collectionId, onClose, onComp
     collectionId: collectionId || '',
     collectionTitle: '',
     label: '',
-    content_data: { description: '', attachments: [] },
+    noteJsonId: '',
     storageNodeUrl: '',
     isFavorite: false,
     isUsed: false,
@@ -116,17 +116,13 @@ const NoteForm: React.FC<NoteFormProps> = ({ note, collectionId, onClose, onComp
   const newlyUploadedFiles = useRef<{fileId: string, nodeUrl: string}[]>([]);
 
   useEffect(() => {
-    if (note) {
-      // Directly use content from the note object if available, or fetch if needed
-      // With hybrid storage, content should be in note.content_data
-      if (note.content_data) {
-        setContent(note.content_data);
+    if (note?.noteJsonId) {
+      const load = async () => {
+        const data = await fetchNoteContent(note.noteJsonId, note.storageNodeUrl);
+        if (data) setContent(data);
         setIsLoading(false);
-      } else {
-        // Fallback for migration if content_data is missing but noteJsonId exists?
-        // Assuming metadata migration is done, we just use default
-        setIsLoading(false); 
-      }
+      };
+      load();
     }
   }, [note]);
 

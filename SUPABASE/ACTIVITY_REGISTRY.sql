@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS public.activities (
     "link" TEXT,
     "isFavorite" BOOLEAN DEFAULT false,
     "vaultJsonId" TEXT, -- Sharding ID untuk dokumentasi
-    "vault_data" JSONB DEFAULT '[]'::jsonb, -- Hybrid Storage: Direct Attachment List
     "storageNodeUrl" TEXT, -- URL Worker GAS untuk vault
     "certificateFileId" TEXT, -- ID File sertifikat fisik di Drive
     "certificateNodeUrl" TEXT, -- URL Worker GAS untuk sertifikat
@@ -39,9 +38,6 @@ ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
 
 -- Kebijakan Akses Publik (Read/Write)
 CREATE POLICY "Public Access Activities" ON public.activities FOR ALL USING (true);
-
--- Update Schema for Hybrid Storage (Safe Migration)
-ALTER TABLE public.activities ADD COLUMN IF NOT EXISTS "vault_data" JSONB DEFAULT '[]'::jsonb;
 
 -- Fungsi Trigger untuk update otomatis search_all
 CREATE OR REPLACE FUNCTION public.update_activity_search_index()

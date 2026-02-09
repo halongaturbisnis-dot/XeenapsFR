@@ -57,12 +57,15 @@ const ConsultationResultView: React.FC<ConsultationResultViewProps> = ({ collect
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!initialAnswer) {
-      if (consultation.answer_data) {
-        setAnswerContent(consultation.answer_data);
+    const loadStoredAnswer = async () => {
+      if (!initialAnswer && consultation.answerJsonId) {
+        setIsLoading(true);
+        const data = await fetchFileContent(consultation.answerJsonId, consultation.nodeUrl);
+        if (data) setAnswerContent(data);
         setIsLoading(false);
       }
-    }
+    };
+    loadStoredAnswer();
   }, [consultation, initialAnswer]);
 
   // Prevent accidental browser closure
@@ -233,6 +236,10 @@ const ConsultationResultView: React.FC<ConsultationResultViewProps> = ({ collect
       // Melakukan cleanup tanpa memblokir UI thread
       (async () => {
         try {
+          // Physical Cleanup (GAS)
+          if (consultation.answerJsonId && consultation.nodeUrl) {
+             await deleteRemoteFile(consultation.answerJsonId, consultation.nodeUrl);
+          }
           // Metadata Cleanup (Supabase)
           await deleteConsultation(consultation.id);
         } catch (e) {

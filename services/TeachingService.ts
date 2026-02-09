@@ -4,15 +4,13 @@ import { GAS_WEB_APP_URL } from '../constants';
 import { 
   fetchTeachingPaginatedFromSupabase, 
   upsertTeachingToSupabase, 
-  deleteTeachingFromSupabase,
-  fetchTeachingByIdFromSupabase
+  deleteTeachingFromSupabase 
 } from './TeachingSupabaseService';
-import { deleteRemoteFile } from './ActivityService';
 
 /**
  * XEENAPS TEACHING SERVICE (HYBRID ARCHITECTURE)
- * Metadata & Vault: Supabase (JSONB)
- * File Storage: GAS (Binary)
+ * Metadata: Supabase
+ * Storage: GAS
  */
 
 export const fetchTeachingPaginated = async (
@@ -45,45 +43,55 @@ export const deleteTeachingItem = async (id: string): Promise<boolean> => {
   // SILENT BROADCAST FOR DASHBOARD
   window.dispatchEvent(new CustomEvent('xeenaps-teaching-deleted', { detail: id }));
 
+  // Metadata Cleanup (Supabase)
+  // Note: Physical file cleanup can be added here if needed using fetchTeachingById and deleteRemoteFile pattern
+  return await deleteTeachingFromSupabase(id);
+};
+
+/**
+ * VAULT: Fetch Teaching Documentation Vault (Kept on GAS for Physical Files)
+ */
+export const fetchTeachingVaultContent = async (vaultJsonId: string, nodeUrl?: string): Promise<TeachingVaultItem[]> => {
+  if (!vaultJsonId) return [];
   try {
-    // 1. Fetch Item to get Vault Files
-    const item = await fetchTeachingByIdFromSupabase(id);
-
-    // 2. Physical File Cleanup (Vault attachments)
-    if (item && item.vault_data && Array.isArray(item.vault_data)) {
-      item.vault_data.forEach(vItem => {
-        if (vItem.type === 'FILE' && vItem.fileId && vItem.nodeUrl) {
-          deleteRemoteFile(vItem.fileId, vItem.nodeUrl);
-        }
-      });
-    }
-
-    // 3. Metadata Cleanup (Supabase)
-    return await deleteTeachingFromSupabase(id);
+    const targetUrl = nodeUrl || GAS_WEB_APP_URL;
+    if (!targetUrl) return [];
+    const finalUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getFileContent&fileId=${vaultJsonId}`;
+    const response = await fetch(finalUrl);
+    const result = await response.json();
+    return result.status === 'success' ? JSON.parse(result.content) : [];
   } catch (e) {
-    console.error("Delete Teaching Failed:", e);
-    return false;
+    return [];
   }
 };
 
 /**
- * HYBRID: Vault content extractor from Item
- */
-export const fetchTeachingVaultContent = async (item: TeachingItem): Promise<TeachingVaultItem[]> => {
-  return item.vault_data || [];
-};
-
-/**
- * HYBRID: Vault content updator (via Item upsert)
+ * VAULT: Update Teaching Vault JSON (Kept on GAS)
  */
 export const updateTeachingVaultContent = async (
-  item: TeachingItem, 
-  newContent: TeachingVaultItem[]
-): Promise<boolean> => {
-  const updatedItem = {
-    ...item,
-    vault_data: newContent,
-    updatedAt: new Date().toISOString()
-  };
-  return await saveTeachingItem(updatedItem);
+  teachingId: string, 
+  vaultJsonId: string, 
+  content: TeachingVaultItem[], 
+  nodeUrl?: string
+): Promise<{ success: boolean, newVaultId?: string, newNodeUrl?: string }> => {
+  try {
+    let targetUrl = nodeUrl || GAS_WEB_APP_URL!;
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        action: 'saveJsonFile', 
+        fileId: vaultJsonId, 
+        fileName: `teaching_vault_${teachingId}.json`,
+        content: JSON.stringify(content) 
+      })
+    });
+    const result = await res.json();
+    return { 
+      success: result.status === 'success', 
+      newVaultId: result.fileId,
+      newNodeUrl: targetUrl 
+    };
+  } catch (e) {
+    return { success: false };
+  }
 };

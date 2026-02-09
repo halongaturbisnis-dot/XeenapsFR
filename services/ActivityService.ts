@@ -10,8 +10,8 @@ import {
 
 /**
  * XEENAPS ACTIVITY SERVICE (HYBRID MIGRATION)
- * Metadata & Vault: Supabase (JSONB)
- * File Storage: Google Apps Script (Drive) - Binary Only
+ * Metadata: Supabase
+ * Storage: Google Apps Script (Drive)
  */
 
 export const fetchActivitiesPaginated = async (
@@ -23,7 +23,7 @@ export const fetchActivitiesPaginated = async (
   type: string = "All",
   signal?: AbortSignal
 ): Promise<{ items: ActivityItem[], totalCount: number }> => {
-  // Direct call to Supabase Registry (Includes vault_data JSONB)
+  // Direct call to Supabase Registry
   return await fetchActivitiesPaginatedFromSupabase(
     page, 
     limit, 
@@ -49,7 +49,7 @@ export const deleteActivity = async (id: string): Promise<boolean> => {
   window.dispatchEvent(new CustomEvent('xeenaps-activity-deleted', { detail: id }));
 
   try {
-    // 1. Fetch Item to get File IDs (Cert Only - Vault items handled internally or lazy clean)
+    // 1. Fetch Item to get File IDs (Cert & Vault)
     const item = await fetchActivityByIdFromSupabase(id);
     
     // 2. Physical File Cleanup (Fire & Forget to GAS)
@@ -57,14 +57,11 @@ export const deleteActivity = async (id: string): Promise<boolean> => {
       if (item.certificateFileId && item.certificateNodeUrl) {
          deleteRemoteFile(item.certificateFileId, item.certificateNodeUrl);
       }
-      
-      // Cleanup files attached in Vault (if any)
-      if (item.vault_data && Array.isArray(item.vault_data)) {
-        item.vault_data.forEach(vItem => {
-          if (vItem.type === 'FILE' && vItem.fileId && vItem.nodeUrl) {
-            deleteRemoteFile(vItem.fileId, vItem.nodeUrl);
-          }
-        });
+      if (item.vaultJsonId && item.storageNodeUrl) {
+         deleteRemoteFile(item.vaultJsonId, item.storageNodeUrl);
+         // Note: Deep vault content cleanup (files inside vault) is complex in background 
+         // without parsing JSON. We rely on 'Lazy Cleanup' or manual vault purge for now 
+         // to keep UI snappy, or assume specific cleanup isn't critical for orphan files.
       }
     }
 
@@ -82,9 +79,6 @@ export const deleteActivity = async (id: string): Promise<boolean> => {
  */
 export const deleteRemoteFile = async (fileId: string, nodeUrl: string): Promise<boolean> => {
   try {
-    // Optimistic check: if fileId starts with 'optimistic_', skip network call
-    if (fileId.startsWith('optimistic_')) return true;
-
     const res = await fetch(nodeUrl, {
       method: 'POST',
       body: JSON.stringify({ action: 'deleteRemoteFiles', fileIds: [fileId] })
@@ -97,31 +91,63 @@ export const deleteRemoteFile = async (fileId: string, nodeUrl: string): Promise
 };
 
 /**
- * HYBRID: Vault content is now part of the ActivityItem.
- * This function extracts it for compatibility or direct usage.
+ * SHARDING: Fetch Vault JSON Content from Storage Node
  */
-export const fetchVaultContent = async (item: ActivityItem): Promise<ActivityVaultItem[]> => {
-  return item.vault_data || [];
+export const fetchVaultContent = async (vaultJsonId: string, nodeUrl?: string): Promise<ActivityVaultItem[]> => {
+  if (!vaultJsonId) return [];
+  try {
+    const targetUrl = nodeUrl || GAS_WEB_APP_URL;
+    if (!targetUrl) return [];
+    const finalUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getFileContent&fileId=${vaultJsonId}`;
+    const response = await fetch(finalUrl);
+    const result = await response.json();
+    return result.status === 'success' ? JSON.parse(result.content) : [];
+  } catch (e) {
+    return [];
+  }
 };
 
 /**
- * HYBRID: Updates Vault Content by updating the ActivityItem directly.
- * Replaces old GAS JSON write.
+ * SHARDING: Update Vault JSON Content on Storage Node
  */
 export const updateVaultContent = async (
-  item: ActivityItem, 
-  newContent: ActivityVaultItem[]
-): Promise<boolean> => {
-  const updatedItem = {
-    ...item,
-    vault_data: newContent,
-    updatedAt: new Date().toISOString()
-  };
-  return await saveActivity(updatedItem);
+  activityId: string, 
+  vaultJsonId: string, 
+  content: ActivityVaultItem[], 
+  nodeUrl?: string
+): Promise<{ success: boolean, newVaultId?: string, newNodeUrl?: string }> => {
+  try {
+    let targetUrl = nodeUrl || GAS_WEB_APP_URL!;
+    
+    // If we don't have a vault yet, ask the backend for a sharding target first
+    if (!vaultJsonId && !nodeUrl) {
+      const quotaRes = await fetch(`${GAS_WEB_APP_URL}?action=checkQuota`);
+      // Quota management is handled on GAS side via action: 'saveJsonFile' logic 
+      // but we ensure we are hitting the master first to let it decide if it needs to proxy.
+    }
+
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        action: 'saveJsonFile', 
+        fileId: vaultJsonId, 
+        fileName: `vault_${activityId}.json`,
+        content: JSON.stringify(content) 
+      })
+    });
+    const result = await res.json();
+    return { 
+      success: result.status === 'success', 
+      newVaultId: result.fileId,
+      newNodeUrl: targetUrl 
+    };
+  } catch (e) {
+    return { success: false };
+  }
 };
 
 /**
- * Dynamic Sharded Binary Upload for Vault (Files Only)
+ * Dynamic Sharded Binary Upload for Vault
  * Returns both fileId and nodeUrl where the file was actually stored
  */
 export const uploadVaultFile = async (file: File): Promise<{ fileId: string, nodeUrl: string } | null> => {
