@@ -24,7 +24,7 @@ import ReviewSourceSelectorModal from './ReviewSourceSelectorModal';
 import { showXeenapsToast } from '../../../utils/toastUtils';
 import { showXeenapsDeleteConfirm } from '../../../utils/confirmUtils';
 import LibraryDetailView from '../../Library/LibraryDetailView';
-import { GlobalSavingOverlay } from '../Common/LoadingComponents';
+import { GlobalSavingOverlay } from '../../Common/LoadingComponents';
 import Swal from 'sweetalert2';
 import { XEENAPS_SWAL_CONFIG } from '../../../utils/swalUtils';
 

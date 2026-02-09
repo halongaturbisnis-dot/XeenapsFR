@@ -59,6 +59,7 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
     balance: 0,
     description: '',
     storageNodeUrl: '',
+    attachments_data: { attachments: [] },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });

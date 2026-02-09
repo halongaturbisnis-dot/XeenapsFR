@@ -89,8 +89,8 @@ const TracerLogModal: React.FC<TracerLogModalProps> = ({ projectId, log, initial
     projectId,
     date: new Date().toISOString().split('T')[0],
     title: '',
-    // Removed logJsonId initialization
     storageNodeUrl: '',
+    log_data: { description: '', attachments: [] },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
