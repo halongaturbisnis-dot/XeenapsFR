@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'Xeenaps PKM',
         short_name: 'Xeenaps',
         description: 'A modern Personal Knowledge Management application',
-        theme_color: '#004A74',
+        theme_color: '#FFFFFF',
         background_color: '#FFFFFF',
         display: 'standalone',
         scope: '/',
