@@ -106,9 +106,13 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
   const navigate = useNavigate();
   const [isQuoteOpen, setIsQuoteOpen] = useState(false);
   const [showCite, setShowCite] = useState(false);
-  const [content, setContent] = useState<TracerReferenceContent>({ quotes: [] });
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingContent, setIsLoadingContent] = useState(false); // FOR INLINE SKELETON
+  
+  // DIRECT REGISTRY: Initialize from refRow.quotes
+  const [content, setContent] = useState<TracerReferenceContent>({ 
+    quotes: refRow.quotes || [] 
+  });
+  
+  const [isLoadingContent, setIsLoadingContent] = useState(false); 
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [openLangMenu, setOpenLangMenu] = useState<string | null>(null);
 
@@ -120,11 +124,12 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
     { label: "German", code: "de" }, { label: "Spanish", code: "es" }, { label: "Portuguese", code: "pt" }
   ];
 
+  // Fallback load for legacy items
   useEffect(() => {
-    const loadContent = async () => {
-      // ONLY LOAD IF JSON ID EXISTS
-      if (localRefRow.contentJsonId) {
-        setIsLoadingContent(true);
+    const isDirect = refRow.quotes !== undefined;
+    if (!isDirect && localRefRow.contentJsonId) {
+      setIsLoadingContent(true);
+      const loadContent = async () => {
         try {
           const data = await fetchReferenceContent(localRefRow.contentJsonId, localRefRow.storageNodeUrl);
           if (data) setContent(data);
@@ -133,19 +138,18 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
         } finally {
           setIsLoadingContent(false);
         }
-      }
-      setIsLoading(false);
-    };
-    loadContent();
+      };
+      loadContent();
+    }
   }, [localRefRow.contentJsonId, localRefRow.storageNodeUrl]);
 
   const handleSaveContent = async (newContent: TracerReferenceContent) => {
     // Sync UI first
     setContent(newContent);
-    // Background Sync with current metadata
+    // Background Sync with current metadata (Direct Registry)
     const result = await saveReferenceContent(localRefRow, newContent);
     if (result) {
-        // ESSENTIAL: Update localRefRow with newly assigned IDs if this was first write
+        // ESSENTIAL: Update localRefRow
         setLocalRefRow(prev => ({
             ...prev,
             contentJsonId: result.contentJsonId,
@@ -289,7 +293,7 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
                </div>
 
                <div className="space-y-4">
-                  {(isLoading || isLoadingContent) ? (
+                  {isLoadingContent ? (
                     /* INLINE SKELETON LOADING AREA */
                     <div className="space-y-4">
                       {[1,2].map(i => (
@@ -355,7 +359,7 @@ const ReferenceDetailView: React.FC<ReferenceDetailViewProps> = ({ item, refRow,
                              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2"><Quote size={12}/> Verbatim Source</span>
                              <button onClick={() => handleCopy(quote.originalText)} className="text-[8px] font-black text-[#004A74] uppercase hover:underline">Copy Verbatim</button>
                           </div>
-                          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-[11px] font-bold italic text-gray-500 leading-relaxed">
+                          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-[11px] font-bold italic text-gray-400 leading-relaxed">
                              "{quote.originalText}"
                           </div>
                           <div className="flex items-center justify-between pt-2">

@@ -176,7 +176,7 @@ const FindArticle: React.FC = () => {
           </div>
         ) : results.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center opacity-20 py-20">
-            <Search className="w-20 h-20 mb-4 text-[#004A74]" />
+            <FileText className="w-20 h-20 mb-4 text-[#004A74]" />
             <h3 className="text-lg font-black text-[#004A74] uppercase tracking-[0.3em]">Ready to Discover</h3>
             <p className="text-sm font-medium mt-2">Enter keywords to browse millions of research papers.</p>
           </div>

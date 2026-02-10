@@ -17,7 +17,7 @@ import {
   ListBulletIcon,
   Squares2X2Icon
 } from '@heroicons/react/24/outline';
-import { Grip, Trash2 } from 'lucide-react';
+import { Grip, Trash2, ListTodo } from 'lucide-react';
 import QuestionSetupModal from './QuestionSetupModal';
 import CbtFocusMode from './CbtFocusMode';
 import QuestionDetailView from './QuestionDetailView';
@@ -336,9 +336,9 @@ const RelatedQuestion: React.FC<RelatedQuestionProps> = ({ collection, onBack })
           <div className="mt-4"><CardGridSkeleton count={6} /></div>
         ) : questions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
-            <AcademicCapIcon className="w-16 h-16 md:w-20 md:h-20 mb-4 text-[#004A74]" />
+            <ListTodo className="w-16 h-16 md:w-20 md:h-20 mb-4 text-[#004A74]" />
             <h3 className="text-lg font-black text-[#004A74] uppercase tracking-widest">No Items Match</h3>
-            <p className="text-xs md:sm font-medium text-gray-500 mt-2">Try adjusting your search query or Bloom Filter.</p>
+      
             <button onClick={() => { setAppliedSearch(''); setLocalSearch(''); setActiveBloomFilter('All'); }} className="mt-8 text-[#004A74] font-black underline uppercase tracking-widest text-[10px] md:text-xs">
               Clear All Filters
             </button>

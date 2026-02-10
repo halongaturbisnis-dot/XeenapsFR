@@ -1,3 +1,4 @@
+
 -- XEENAPS TRACER REGISTRY SCHEMA
 -- Menggantikan Google Sheets untuk Audit Trail & Lab Logs
 
@@ -30,8 +31,10 @@ CREATE TABLE IF NOT EXISTS public.tracer_logs (
     "projectId" TEXT REFERENCES public.tracer_projects("id") ON DELETE CASCADE,
     "date" TEXT,
     "title" TEXT,
-    "logJsonId" TEXT, -- File fisik JSON di Drive
+    "logJsonId" TEXT, -- File fisik JSON di Drive (Legacy)
     "storageNodeUrl" TEXT,
+    "description" TEXT, -- Direct Content
+    "vault_items" JSONB DEFAULT '[]'::jsonb, -- Direct Attachments
     "createdAt" TIMESTAMPTZ DEFAULT now(),
     "updatedAt" TIMESTAMPTZ DEFAULT now()
 );
@@ -41,8 +44,9 @@ CREATE TABLE IF NOT EXISTS public.tracer_references (
     "id" TEXT PRIMARY KEY,
     "projectId" TEXT REFERENCES public.tracer_projects("id") ON DELETE CASCADE,
     "collectionId" TEXT NOT NULL,
-    "contentJsonId" TEXT, -- File fisik JSON untuk quotes
+    "contentJsonId" TEXT, -- File fisik JSON untuk quotes (Legacy)
     "storageNodeUrl" TEXT,
+    "quotes" JSONB DEFAULT '[]'::jsonb, -- Direct Quotes
     "createdAt" TIMESTAMPTZ DEFAULT now()
 );
 
@@ -72,8 +76,9 @@ CREATE TABLE IF NOT EXISTS public.tracer_finance (
     "debit" NUMERIC DEFAULT 0,
     "balance" NUMERIC DEFAULT 0,
     "description" TEXT,
-    "attachmentsJsonId" TEXT, -- File fisik JSON untuk bukti
+    "attachmentsJsonId" TEXT, -- File fisik JSON untuk bukti (Legacy)
     "storageNodeUrl" TEXT,
+    "attachments" JSONB DEFAULT '[]'::jsonb, -- Direct Attachments
     "createdAt" TIMESTAMPTZ DEFAULT now(),
     "updatedAt" TIMESTAMPTZ DEFAULT now(),
     "search_all" TEXT

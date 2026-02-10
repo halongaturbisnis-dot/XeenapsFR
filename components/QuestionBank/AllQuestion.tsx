@@ -500,9 +500,9 @@ const AllQuestion: React.FC<AllQuestionProps> = ({ items }) => {
                   <tr>
                     <td colSpan={7} className="py-32 text-center">
                       <div className="flex flex-col items-center justify-center opacity-30">
-                        <AcademicCapIcon className="w-20 h-20 mb-4" />
+                        <ListTodo className="w-20 h-20 mb-4" />
                         <h3 className="text-lg font-black uppercase tracking-widest">No Questions Found</h3>
-                        <p className="text-xs font-medium mt-2">Adjust your filters or generate new questions.</p>
+                        <p className="text-xs font-medium mt-2">generate new questions.</p>
                       </div>
                     </td>
                   </tr>

@@ -1,4 +1,5 @@
 
+
 import { getSupabase } from './supabaseClient';
 import { TracerProject, TracerLog, TracerReference, TracerTodo, TracerFinanceItem } from '../types';
 
@@ -22,19 +23,8 @@ export const fetchTracerProjectsFromSupabase = async (
   let query = client.from('tracer_projects').select('*', { count: 'exact' });
 
   if (search) {
-    // Specifically target label, title, and rely on search_all for authors text search 
-    // or construct an OR filter for specific fields as requested.
-    // Since 'authors' is text[], simple ilike is tricky. We use the robust search_all index 
-    // which aggregates these fields, but we ensure the UI text reflects the fields we care about.
-    // However, to be strictly compliant with "pencariannya hanya menggunakan variabel tersebut", 
-    // we limit the scope if possible. But given Supabase limitations with array ILIKE in OR groups without extensions,
-    // relying on the pre-computed 'search_all' trigger column is the most reliable way to search these fields 
-    // without missing data, as the trigger concatenates label, title, and authors (if updated).
-    // Note: The previous SQL definition for trigger included title, label, topic, status. 
-    // It missed Authors.
-    // For now, we will stick to search_all as the standard but acknowledge the limitation on Authors if the SQL isn't updated.
-    // To strictly follow "Only use Title and Label" if Authors is missing in index:
-    query = query.or(`label.ilike.%${search}%,title.ilike.%${search}%`);
+    // Rely on search_all trigger column
+    query = query.ilike('search_all', `%${search.toLowerCase()}%`);
   }
 
   query = query.order(sortKey, { ascending: sortDir === 'asc' });
@@ -83,7 +73,14 @@ export const fetchTracerLogsFromSupabase = async (projectId: string): Promise<Tr
 export const upsertTracerLogToSupabase = async (item: TracerLog): Promise<boolean> => {
   const client = getSupabase();
   if (!client) return false;
-  const { error } = await client.from('tracer_logs').upsert(item);
+  
+  // Ensure vault_items is array
+  const payload = {
+    ...item,
+    vault_items: Array.isArray(item.vault_items) ? item.vault_items : []
+  };
+
+  const { error } = await client.from('tracer_logs').upsert(payload);
   return !error;
 };
 
@@ -107,7 +104,14 @@ export const fetchTracerReferencesFromSupabase = async (projectId: string): Prom
 export const upsertTracerReferenceToSupabase = async (item: TracerReference): Promise<boolean> => {
   const client = getSupabase();
   if (!client) return false;
-  const { error } = await client.from('tracer_references').upsert(item);
+
+  // Ensure quotes is array
+  const payload = {
+    ...item,
+    quotes: Array.isArray(item.quotes) ? item.quotes : []
+  };
+
+  const { error } = await client.from('tracer_references').upsert(payload);
   return !error;
 };
 
@@ -184,7 +188,14 @@ export const upsertTracerFinanceToSupabase = async (item: TracerFinanceItem): Pr
   const client = getSupabase();
   if (!client) return false;
   const { search_all, ...cleanItem } = item as any;
-  const { error } = await client.from('tracer_finance').upsert(cleanItem);
+
+  // Ensure attachments is array
+  const payload = {
+    ...cleanItem,
+    attachments: Array.isArray(cleanItem.attachments) ? cleanItem.attachments : []
+  };
+
+  const { error } = await client.from('tracer_finance').upsert(payload);
   return !error;
 };
 

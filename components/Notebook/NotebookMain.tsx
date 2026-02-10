@@ -274,7 +274,7 @@ const NotebookMain: React.FC<NotebookMainProps> = ({ libraryItems = [], collecti
           <CardGridSkeleton count={8} />
         ) : items.length === 0 ? (
           <div className="py-40 text-center flex flex-col items-center justify-center space-y-4 opacity-30 grayscale">
-             <StickyNote size={80} strokeWidth={1} className="text-[#004A74]" />
+             <NotebookPen size={80} strokeWidth={1} className="text-[#004A74]" />
              <p className="text-sm font-black uppercase tracking-[0.4em]">Notebook is empty</p>
           </div>
         ) : (

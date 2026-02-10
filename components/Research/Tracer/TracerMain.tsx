@@ -191,7 +191,7 @@ const TracerMain: React.FC = () => {
         {isLoading ? <CardGridSkeleton count={8} /> : projects.length === 0 ? (
           <div className="py-40 text-center flex flex-col items-center justify-center space-y-4 opacity-20">
              <Target size={80} strokeWidth={1} />
-             <p className="text-sm font-black uppercase tracking-[0.4em]">Audit Registry Empty</p>
+             <p className="text-sm font-black uppercase tracking-[0.4em]">No Research Found</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 px-1">

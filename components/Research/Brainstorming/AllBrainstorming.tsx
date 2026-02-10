@@ -10,6 +10,7 @@ import {
   Eye as EyeIcon, 
   Star as StarIcon,
   Check as CheckIcon,
+  BrainCog, 
   ChevronUp as ChevronUpIcon,
   ChevronDown as ChevronDownIcon,
   ArrowUpDown as ArrowsUpDownIcon,
@@ -397,7 +398,7 @@ const AllBrainstorming: React.FC = () => {
                   <tr>
                     <td colSpan={6} className="px-6 py-24 text-center">
                       <div className="flex flex-col items-center justify-center space-y-2 opacity-30">
-                        <SparklesIcon size={48} className="mb-4 text-[#004A74]" />
+                        <BrainCog size={48} className="mb-4 text-[#004A74]" />
                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Brainstorming Projects Found</p>
                       </div>
                     </td>

@@ -1,4 +1,5 @@
 
+
 import { TracerProject, TracerLog, TracerReference, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse, TracerLogContent, TracerReferenceContent } from '../types';
 import { GAS_WEB_APP_URL } from '../constants';
 import { 
@@ -57,46 +58,23 @@ export const fetchTracerLogs = async (projectId: string): Promise<TracerLog[]> =
   return await fetchTracerLogsFromSupabase(projectId);
 };
 
-export const saveTracerLog = async (item: TracerLog, content: { description: string }): Promise<boolean> => {
-  if (!GAS_WEB_APP_URL) return false;
-  
-  try {
-    let updatedItem = { ...item };
+export const saveTracerLog = async (item: TracerLog, content: TracerLogContent): Promise<boolean> => {
+  // DIRECT REGISTRY: Send content as part of the item metadata to Supabase
+  // No need to shard small JSON to GAS anymore
+  const updatedItem: TracerLog = {
+    ...item,
+    description: content.description,
+    vault_items: content.attachments
+  };
 
-    // 1. Sharding Content to GAS
-    if (content) {
-      const res = await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify({ 
-          action: 'saveJsonFile', // Generic GAS action
-          fileId: item.logJsonId || null,
-          fileName: `tracer_log_${item.id}.json`,
-          content: JSON.stringify(content),
-          folderId: null // Uses default folder
-        })
-      });
-      const result = await res.json();
-      
-      if (result.status === 'success') {
-        updatedItem.logJsonId = result.fileId;
-        updatedItem.storageNodeUrl = result.nodeUrl || GAS_WEB_APP_URL; // Update Node URL
-      } else {
-        throw new Error("Failed to save log content to drive.");
-      }
-    }
-
-    // 2. Save Metadata to Supabase
-    return await upsertTracerLogToSupabase(updatedItem);
-
-  } catch (e) {
-    console.error("Save Tracer Log Failed:", e);
-    return false;
-  }
+  // Save Metadata to Supabase
+  return await upsertTracerLogToSupabase(updatedItem);
 };
 
 export const deleteTracerLog = async (id: string): Promise<boolean> => {
-  // Optional: Fetch item to clean up file if ID known. 
-  // For now, metadata deletion is prioritized.
+  // Metadata deletion is prioritized.
+  // Physical file cleanup (if any legacy exists) can be added if needed, 
+  // but direct registry doesn't use new files.
   return await deleteTracerLogFromSupabase(id);
 };
 
@@ -114,6 +92,7 @@ export const linkTracerReference = async (item: Partial<TracerReference>): Promi
       collectionId: item.collectionId || '',
       contentJsonId: '',
       storageNodeUrl: '',
+      quotes: [], // Initialize empty
       createdAt: new Date().toISOString()
     };
     
@@ -128,54 +107,27 @@ export const unlinkTracerReference = async (id: string): Promise<boolean> => {
   return await deleteTracerReferenceFromSupabase(id);
 };
 
-/**
- * SHARDING: Reference Content (Quotes)
- */
-export const fetchReferenceContent = async (contentJsonId: string, nodeUrl?: string): Promise<TracerReferenceContent | null> => {
-  if (!contentJsonId) return null;
-  try {
-    const targetUrl = nodeUrl || GAS_WEB_APP_URL;
-    if (!targetUrl) return null;
-    const finalUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}action=getFileContent&fileId=${contentJsonId}`;
-    const response = await fetch(finalUrl);
-    const result = await response.json();
-    return result.status === 'success' ? JSON.parse(result.content) : null;
-  } catch (e) {
-    return null;
-  }
+export const fetchReferenceContent = async (fileId: string, nodeUrl?: string): Promise<TracerReferenceContent | null> => {
+  return await fetchFileContent(fileId, nodeUrl);
 };
 
+/**
+ * DIRECT REGISTRY: Save Reference Content (Quotes)
+ */
 export const saveReferenceContent = async (item: TracerReference, content: TracerReferenceContent): Promise<{contentJsonId: string, storageNodeUrl: string} | null> => {
-  if (!GAS_WEB_APP_URL) return null;
+  // DIRECT REGISTRY: Update item with quotes and save to Supabase
+  const updatedItem: TracerReference = {
+    ...item,
+    quotes: content.quotes
+  };
   
-  try {
-    // 1. Sharding Content
-    const res = await fetch(GAS_WEB_APP_URL, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        action: 'saveJsonFile', 
-        fileId: item.contentJsonId || null,
-        fileName: `ref_content_${item.id}.json`,
-        content: JSON.stringify(content)
-      })
-    });
-    const result = await res.json();
-    
-    if (result.status === 'success') {
-       // 2. Update Metadata Registry
-       const updatedItem = {
-         ...item,
-         contentJsonId: result.fileId,
-         storageNodeUrl: result.nodeUrl || GAS_WEB_APP_URL
-       };
-       await upsertTracerReferenceToSupabase(updatedItem);
-       
-       return { contentJsonId: result.fileId, storageNodeUrl: updatedItem.storageNodeUrl };
-    }
-    return null;
-  } catch (e) {
-    return null;
+  const success = await upsertTracerReferenceToSupabase(updatedItem);
+  
+  if (success) {
+      // Return existing IDs just to satisfy interface or dummy values
+      return { contentJsonId: item.contentJsonId, storageNodeUrl: item.storageNodeUrl };
   }
+  return null;
 };
 
 // --- 4. TODOS ---
@@ -232,22 +184,20 @@ export const exportFinanceLedger = async (projectId: string, currency: string): 
      const projectTitle = project?.title || project?.label || "Financial Report";
      const projectAuthors = Array.isArray(project?.authors) ? project.authors.join(", ") : "Xeenaps User";
 
-     // 4. Enrich Items with Attachment Links (Async Batch)
-     const enrichedTransactions = await Promise.all(calculatedItems.map(async (item) => {
+     // 4. Enrich Items with Attachment Links
+     // DIRECT REGISTRY: Attachments are now in item.attachments
+     const enrichedTransactions = calculatedItems.map(item => {
         let linkString = "-";
-        if (item.attachmentsJsonId) {
-           try {
-              const content = await fetchFileContent(item.attachmentsJsonId, item.storageNodeUrl);
-              if (content && Array.isArray(content.attachments)) {
-                 const urls = content.attachments.map((a: any) => 
-                    a.url || (a.fileId ? `https://drive.google.com/file/d/${a.fileId}/view` : "")
-                 ).filter((u: string) => u !== "");
-                 if (urls.length > 0) linkString = urls.join(" | ");
-              }
-           } catch (e) { console.warn("Failed to fetch attachment for export", e); }
+        if (item.attachments && Array.isArray(item.attachments)) {
+            const urls = item.attachments.map((a: any) => 
+                a.url || (a.fileId ? `https://drive.google.com/file/d/${a.fileId}/view` : "")
+            ).filter((u: string) => u !== "");
+            if (urls.length > 0) linkString = urls.join(" | ");
         }
+        // Legacy fallback: fetch from GAS if attachmentsJsonId exists but attachments is empty
+        // Omitted for simplicity as migration assumes new structure or re-save
         return { ...item, links: linkString };
-     }));
+     });
 
      // 5. Construct Payload
      const payload = {
@@ -278,35 +228,14 @@ export const exportFinanceLedger = async (projectId: string, currency: string): 
 };
 
 export const saveTracerFinance = async (item: TracerFinanceItem, content: TracerFinanceContent): Promise<boolean> => {
-  if (!GAS_WEB_APP_URL) return false;
-  
-  try {
-    let updatedItem = { ...item };
+  // DIRECT REGISTRY: Embed attachments in item
+  const updatedItem: TracerFinanceItem = {
+    ...item,
+    attachments: content.attachments
+  };
 
-    // 1. Sharding Content (Attachments)
-    if (content) {
-      const res = await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify({ 
-          action: 'saveJsonFile', 
-          fileId: item.attachmentsJsonId || null,
-          fileName: `fin_attachments_${item.id}.json`,
-          content: JSON.stringify(content)
-        })
-      });
-      const result = await res.json();
-      
-      if (result.status === 'success') {
-         updatedItem.attachmentsJsonId = result.fileId;
-         updatedItem.storageNodeUrl = result.nodeUrl || GAS_WEB_APP_URL;
-      }
-    }
-
-    // 2. Save Metadata to Supabase
-    return await upsertTracerFinanceToSupabase(updatedItem);
-  } catch (e) {
-    return false;
-  }
+  // Save Metadata to Supabase
+  return await upsertTracerFinanceToSupabase(updatedItem);
 };
 
 export const deleteTracerFinance = async (id: string): Promise<GASResponse<any>> => {

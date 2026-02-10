@@ -19,7 +19,7 @@ import {
   XMarkIcon, 
   ClockIcon
 } from '@heroicons/react/24/outline';
-import { Grip, Trash2 } from 'lucide-react';
+import { Grip, Trash2, Presentation } from 'lucide-react';
 import PresentationSetupModal from './PresentationSetupModal';
 import TeachingSessionPicker from '../Teaching/TeachingSessionPicker';
 import { CardGridSkeleton, TableSkeletonRows } from '../Common/LoadingComponents';
@@ -313,7 +313,7 @@ const RelatedPresentations: React.FC<RelatedPresentationsProps> = ({ collection,
             isMobile ? <CardGridSkeleton count={4} /> : <div className="mt-4"><TableSkeletonRows count={8} /></div>
           ) : presentations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
-              <PresentationChartBarIcon className="w-20 h-20 mb-4 text-[#004A74]" />
+              <Presentation className="w-20 h-20 mb-4 text-[#004A74]" />
               <h3 className="text-lg font-black text-[#004A74] uppercase tracking-widest">No Presentations Found</h3>
               <p className="text-sm font-medium text-gray-500 mt-2">Transform your collection into visual synthesis.</p>
             </div>

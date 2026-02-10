@@ -37,7 +37,7 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
   const [isCredit, setIsCredit] = useState(item ? (item.credit > 0) : true);
   const [amountStr, setAmountStr] = useState(item ? (item.credit || item.debit).toString() : '0');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoadingContent, setIsLoadingContent] = useState(!!item?.attachmentsJsonId);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // New state to track uploads in progress
@@ -60,16 +60,23 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
     description: '',
     attachmentsJsonId: '',
     storageNodeUrl: '',
+    attachments: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
 
-  const [content, setContent] = useState<TracerFinanceContent>({ attachments: [] });
+  const [content, setContent] = useState<TracerFinanceContent>({ 
+    attachments: item?.attachments || [] 
+  });
+  
   // Track newly uploaded files for cleanup if not saved
   const [newlyUploadedFiles, setNewlyUploadedFiles] = useState<{fileId: string, nodeUrl: string}[]>([]);
 
+  // Fallback Load for legacy items
   useEffect(() => {
-    if (item?.attachmentsJsonId) {
+    const isDirect = item && item.attachments !== undefined;
+    if (!isDirect && item?.attachmentsJsonId) {
+      setIsLoadingContent(true);
       const load = async () => {
         const data = await fetchFileContent(item.attachmentsJsonId, item.storageNodeUrl);
         if (data) setContent(data);

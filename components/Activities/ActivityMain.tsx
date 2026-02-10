@@ -231,7 +231,7 @@ const ActivityDashboard: React.FC = () => {
           <CardGridSkeleton count={8} />
         ) : items.length === 0 ? (
           <div className="py-32 text-center flex flex-col items-center justify-center space-y-2 opacity-30">
-            <ClipboardCheck size={64} className="text-[#004A74] mb-4" />
+            <Award size={64} className="text-[#004A74] mb-4" />
             <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Activities Found</p>
             <p className="text-xs text-gray-400 italic">Start building your academic portfolio today.</p>
           </div>

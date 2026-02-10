@@ -482,6 +482,8 @@ export interface TracerLog {
   title: string;
   logJsonId: string; // Sharding ID
   storageNodeUrl: string;
+  description?: string; // New Direct
+  vault_items?: TracerLogAttachment[]; // New Direct
   createdAt: string;
   updatedAt: string;
 }
@@ -520,6 +522,7 @@ export interface TracerReference {
   collectionId: string; // Links to LibraryItem
   contentJsonId: string; // Sharding ID for quotes
   storageNodeUrl: string; // Sharding node URL
+  quotes?: TracerSavedQuote[]; // New Direct
   createdAt: string;
 }
 
@@ -555,6 +558,7 @@ export interface TracerFinanceItem {
   description: string;
   attachmentsJsonId: string;
   storageNodeUrl: string;
+  attachments?: TracerFinanceAttachment[]; // New Direct
   createdAt: string;
   updatedAt: string;
 }

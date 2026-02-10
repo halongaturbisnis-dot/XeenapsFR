@@ -15,7 +15,8 @@ import {
   BookOpen,
   Share2,
   ExternalLink,
-  Settings2 as AdjustmentsHorizontalIcon
+  Settings2 as AdjustmentsHorizontalIcon,
+  BookUp
 } from 'lucide-react';
 import { SmartSearchBox } from '../../Common/SearchComponents';
 import { 
@@ -354,7 +355,7 @@ const AllPublication: React.FC = () => {
                   <tr>
                     <td colSpan={7} className="px-6 py-24 text-center">
                        <div className="flex flex-col items-center justify-center space-y-2 opacity-30">
-                          <Share2 size={48} className="mb-4 text-[#004A74]" />
+                          <BookUp size={48} className="mb-4 text-[#004A74]" />
                           <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Publication Data</p>
                        </div>
                     </td>

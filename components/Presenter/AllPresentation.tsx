@@ -21,7 +21,7 @@ import {
   CheckIcon,
   UserIcon
 } from '@heroicons/react/24/outline';
-import { Grip, Calendar, Trash2 } from 'lucide-react';
+import { Grip, Calendar, Trash2, Presentation } from 'lucide-react';
 import { 
   StandardTableContainer, 
   StandardTableWrapper, 
@@ -425,7 +425,7 @@ const AllPresentation: React.FC<AllPresentationProps> = ({ items }) => {
                   <tr>
                     <td colSpan={6} className="py-32 text-center">
                       <div className="flex flex-col items-center justify-center opacity-40">
-                        <PresentationChartBarIcon className="w-16 h-16 mb-4 text-[#004A74]" />
+                        <Presentation className="w-16 h-16 mb-4 text-[#004A74]" />
                         <p className="text-sm font-bold text-[#004A74] uppercase tracking-widest">No presentations found</p>
                       </div>
                     </td>
@@ -483,7 +483,7 @@ const AllPresentation: React.FC<AllPresentationProps> = ({ items }) => {
             <CardGridSkeleton count={8} />
           ) : presentations.length === 0 ? (
             <div className="py-24 text-center flex flex-col items-center justify-center space-y-2 bg-white border border-gray-100/50 rounded-[2rem] shadow-sm mx-1">
-              <PresentationChartBarIcon className="w-8 h-8 text-gray-300" />
+              <Presentation className="w-8 h-8 text-gray-300" />
               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No presentations found</p>
             </div>
           ) : (

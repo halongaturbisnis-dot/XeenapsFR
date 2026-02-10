@@ -83,7 +83,8 @@ const RichEditor: React.FC<{ value: string; onChange: (v: string) => void; disab
 };
 
 const TracerLogModal: React.FC<TracerLogModalProps> = ({ projectId, log, initialContent, onClose, onSave, onDelete }) => {
-  const [isLoadingContent, setIsLoadingContent] = useState(!!log && !initialContent);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  
   const [formData, setFormData] = useState<TracerLog>(log || {
     id: crypto.randomUUID(),
     projectId,
@@ -91,11 +92,20 @@ const TracerLogModal: React.FC<TracerLogModalProps> = ({ projectId, log, initial
     title: '',
     logJsonId: '',
     storageNodeUrl: '',
+    description: '',
+    vault_items: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   });
 
   const [content, setContent] = useState<TracerLogContent>(() => {
+    // Prioritize direct properties, then initialContent (cache), then fallback
+    if (log && (log.description !== undefined || log.vault_items !== undefined)) {
+       return {
+         description: log.description || '',
+         attachments: log.vault_items || []
+       };
+    }
     if (initialContent) return {
       description: initialContent.description || '',
       attachments: Array.isArray(initialContent.attachments) ? initialContent.attachments : []
@@ -111,8 +121,11 @@ const TracerLogModal: React.FC<TracerLogModalProps> = ({ projectId, log, initial
   // Tracks pending uploads to lock submit button
   const [activeUploads, setActiveUploads] = useState(0);
 
+  // Fallback Load for legacy items only
   useEffect(() => {
-    if (log?.logJsonId && !initialContent) {
+    const isDirect = log && (log.description !== undefined || log.vault_items !== undefined);
+    if (!isDirect && log?.logJsonId && !initialContent) {
+      setIsLoadingContent(true);
       const load = async () => {
         const data = await fetchFileContent(log.logJsonId, log.storageNodeUrl);
         if (data) {

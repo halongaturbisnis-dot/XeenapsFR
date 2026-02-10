@@ -16,7 +16,8 @@ import {
   ArrowUpDown as ArrowsUpDownIcon,
   Check as CheckIcon,
   Settings2 as AdjustmentsHorizontalIcon,
-  Calendar
+  Calendar,
+  TextSearch
 } from 'lucide-react';
 import { SmartSearchBox } from '../Common/SearchComponents';
 import { 
@@ -344,7 +345,7 @@ const ResearchMainView: React.FC<ResearchMainViewProps> = () => {
                   <tr>
                     <td colSpan={6} className="py-32 text-center">
                       <div className="flex flex-col items-center justify-center opacity-40">
-                        <LayersIcon size={48} className="mb-4 text-[#004A74]" />
+                        <TextSearch size={48} className="mb-4 text-[#004A74]" />
                         <h3 className="text-lg font-black uppercase tracking-widest">No Research Projects</h3>
                         <p className="text-sm font-medium mt-2">Start your first gap analysis audit now.</p>
                       </div>
