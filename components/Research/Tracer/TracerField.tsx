@@ -27,6 +27,24 @@ interface TracerFieldProps {
   minHeight?: string;
 }
 
+const LANG_OPTIONS = [
+  { label: "English", code: "en" },
+  { label: "Indonesian", code: "id" },
+  { label: "Portuguese", code: "pt" },
+  { label: "Spanish", code: "es" },
+  { label: "German", code: "de" },
+  { label: "French", code: "fr" },
+  { label: "Dutch", code: "nl" },
+  { label: "Mandarin", code: "zh" },
+  { label: "Japanese", code: "ja" },
+  { label: "Vietnamese", code: "vi" },
+  { label: "Thai", code: "th" },
+  { label: "Hindi", code: "hi" },
+  { label: "Turkish", code: "tr" },
+  { label: "Russian", code: "ru" },
+  { label: "Arabic", code: "ar" }
+];
+
 const TracerField: React.FC<TracerFieldProps> = ({
   label,
   value,
@@ -39,7 +57,7 @@ const TracerField: React.FC<TracerFieldProps> = ({
   placeholder = "...",
   minHeight = "100px"
 }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<'ai' | 'lang' | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isBrainstormingPickerOpen, setIsBrainstormingPickerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -59,7 +77,7 @@ const TracerField: React.FC<TracerFieldProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false);
+        setActiveMenu(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -67,7 +85,7 @@ const TracerField: React.FC<TracerFieldProps> = ({
   }, []);
 
   const handleMagicAction = async (mode: 'REWRITE' | 'EXPAND') => {
-    setIsMenuOpen(false);
+    setActiveMenu(null);
     setIsLoading(true);
     
     try {
@@ -83,11 +101,11 @@ const TracerField: React.FC<TracerFieldProps> = ({
     }
   };
 
-  const handleTranslate = async (lang: 'en' | 'id') => {
-    setIsMenuOpen(false);
+  const handleTranslate = async (langCode: string) => {
+    setActiveMenu(null);
     setIsLoading(true);
     try {
-       const result = await translateTracerField(value, lang);
+       const result = await translateTracerField(value, langCode);
        if (result) {
          onChange(result);
          if (onSave) onSave(result);
@@ -127,6 +145,18 @@ const TracerField: React.FC<TracerFieldProps> = ({
     }
   };
 
+  const buttonClass = `p-1.5 rounded-lg transition-all shadow-sm active:scale-90 flex items-center justify-center ${
+    isDark 
+      ? 'bg-white/10 text-white hover:bg-white hover:text-[#004A74] border border-white/10' 
+      : 'bg-white border border-gray-100 text-gray-400 hover:text-[#004A74] hover:bg-gray-50'
+  }`;
+
+  const activeButtonClass = `p-1.5 rounded-lg transition-all shadow-md active:scale-90 flex items-center justify-center ${
+    isDark 
+      ? 'bg-white text-[#004A74] border border-white' 
+      : 'bg-[#004A74] text-white border border-[#004A74]'
+  }`;
+
   return (
     <div className="space-y-3 relative group/field">
       <label className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-2 ${isDark ? 'text-gray-400' : 'text-[#004A74]'}`}>
@@ -142,62 +172,82 @@ const TracerField: React.FC<TracerFieldProps> = ({
 
       <div className="relative">
         {!isLoading && (
-          <div className="absolute top-2 right-2 z-20" ref={menuRef}>
+          <div className="absolute top-2 right-2 z-20 flex items-center gap-1 opacity-0 group-hover/field:opacity-100 transition-opacity" ref={menuRef}>
+            
+            {/* 1. Translate Button */}
+            <div className="relative">
+              <button
+                onClick={() => setActiveMenu(activeMenu === 'lang' ? null : 'lang')}
+                className={activeMenu === 'lang' ? activeButtonClass : buttonClass}
+                title="Translate"
+                type="button"
+              >
+                <Languages size={12} />
+              </button>
+              {activeMenu === 'lang' && (
+                <div className="absolute right-0 mt-2 w-40 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-30 animate-in fade-in zoom-in-95 origin-top-right">
+                  <div className="p-2 border-b border-gray-50 mb-1">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Select Language</p>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                    {LANG_OPTIONS.map((lang) => (
+                      <button 
+                        key={lang.code}
+                        onClick={() => handleTranslate(lang.code)}
+                        className="w-full text-left px-3 py-1.5 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between"
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Import Button */}
             <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className={`p-2 rounded-xl transition-all shadow-sm active:scale-90 opacity-0 group-hover/field:opacity-100 ${
-                isMenuOpen ? 'opacity-100' : ''
-              } ${
-                isDark 
-                  ? 'bg-white/10 text-white hover:bg-white hover:text-[#004A74]' 
-                  : 'bg-white border border-gray-100 text-[#004A74] hover:bg-[#FED400]/20'
-              }`}
-              title="AI Co-Pilot & Tools"
+              onClick={() => setIsBrainstormingPickerOpen(true)}
+              className={buttonClass + " hover:!text-purple-500 hover:!border-purple-200"}
+              title="Import from Idea"
               type="button"
             >
-              <Sparkles size={14} />
+              <BrainCog size={12} />
             </button>
 
-            {isMenuOpen && (
-              <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-30 animate-in fade-in zoom-in-95 origin-top-right">
-                <div className="p-2 border-b border-gray-50 mb-1 flex justify-between items-center">
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Co-Pilot Actions</p>
-                  <button onClick={() => setIsMenuOpen(false)}><X size={12} className="text-gray-300 hover:text-red-400"/></button>
+            {/* 3. AI Co-Pilot Button */}
+            <div className="relative">
+              <button
+                onClick={() => setActiveMenu(activeMenu === 'ai' ? null : 'ai')}
+                className={activeMenu === 'ai' ? activeButtonClass : buttonClass}
+                title="AI Co-Pilot"
+                type="button"
+              >
+                <Sparkles size={12} />
+              </button>
+              {activeMenu === 'ai' && (
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-30 animate-in fade-in zoom-in-95 origin-top-right">
+                  <div className="p-2 border-b border-gray-50 mb-1 flex justify-between items-center">
+                    <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Co-Pilot</p>
+                    <button onClick={() => setActiveMenu(null)}><X size={12} className="text-gray-300 hover:text-red-400"/></button>
+                  </div>
+                  <button
+                    onClick={() => handleMagicAction('REWRITE')}
+                    className="w-full text-left px-3 py-2 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center gap-2"
+                    type="button"
+                  >
+                    <RefreshCcw size={12} /> Regenerate (Rewrite)
+                  </button>
+                  <button
+                    onClick={() => handleMagicAction('EXPAND')}
+                    className="w-full text-left px-3 py-2 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center gap-2"
+                    type="button"
+                  >
+                    <Maximize2 size={12} /> Expand & Deepen
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleMagicAction('REWRITE')}
-                  className="w-full text-left px-3 py-2.5 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center gap-2"
-                  type="button"
-                >
-                  <RefreshCcw size={12} /> Regenerate (Rewrite)
-                </button>
-                <button
-                  onClick={() => handleMagicAction('EXPAND')}
-                  className="w-full text-left px-3 py-2.5 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center gap-2"
-                  type="button"
-                >
-                  <Maximize2 size={12} /> Expand & Deepen
-                </button>
-                
-                <div className="h-px bg-gray-50 my-1" />
-                <p className="px-3 py-1 text-[8px] font-black text-gray-300 uppercase tracking-widest">Translation</p>
-                <button onClick={() => handleTranslate('en')} className="w-full text-left px-3 py-2 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                   <Languages size={12} /> To English
-                </button>
-                <button onClick={() => handleTranslate('id')} className="w-full text-left px-3 py-2 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg flex items-center gap-2">
-                   <Languages size={12} /> To Indonesian
-                </button>
+              )}
+            </div>
 
-                <div className="h-px bg-gray-50 my-1" />
-                <button 
-                  onClick={() => { setIsMenuOpen(false); setIsBrainstormingPickerOpen(true); }}
-                  className="w-full text-left px-3 py-2.5 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center gap-2"
-                  type="button"
-                >
-                   <BrainCog size={12} className="text-purple-500" /> Import from Idea
-                </button>
-              </div>
-            )}
           </div>
         )}
 
