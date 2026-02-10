@@ -77,8 +77,8 @@ const CollaborationMain: React.FC = () => {
               <Handshake size={24} />
            </div>
            <div>
-              <h2 className="text-2xl font-black text-[#004A74] uppercase tracking-tight">Collaboration</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Partnership Marketplace</p>
+              <h2 className="text-2xl font-black text-[#004A74] uppercase tracking-tight">Promo</h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Partner Promotion</p>
            </div>
         </div>
       </div>
@@ -96,10 +96,6 @@ const CollaborationMain: React.FC = () => {
          </div>
          
          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-xl mr-2 border border-gray-100">
-               <Filter size={14} className="text-gray-400" />
-               <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Filter</span>
-            </div>
             {categories.map(cat => (
                <StandardFilterButton 
                   key={cat} 

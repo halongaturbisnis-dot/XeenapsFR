@@ -52,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose }) => {
 
   const navItemsBlock1 = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutGrid },
-    { name: 'Promo', path: '/collaboration', icon: Megaphone },
+    { name: 'Promo', path: '/collaboration', icon: Handshake },
     { name: 'Library', path: '/library', icon: LibraryBig },
     { name: 'Favorite', path: '/favorite', icon: Star },
     { name: 'Bookmark', path: '/bookmark', icon: Bookmark },
