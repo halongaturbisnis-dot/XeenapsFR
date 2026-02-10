@@ -13,6 +13,7 @@ import {
   Target,
   Inbox,
   LayoutGrid,
+  Megaphone, 
   Handshake,
   LibraryBig,
   FileSearch,
@@ -51,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose }) => {
 
   const navItemsBlock1 = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutGrid },
-    { name: 'Collaboration', path: '/collaboration', icon: Handshake },
+    { name: 'Promo', path: '/collaboration', icon: Megaphone },
     { name: 'Library', path: '/library', icon: LibraryBig },
     { name: 'Favorite', path: '/favorite', icon: Star },
     { name: 'Bookmark', path: '/bookmark', icon: Bookmark },
