@@ -4,6 +4,7 @@ import { ConsultationItem } from '../types';
 /**
  * XEENAPS CONSULTATION SUPABASE SERVICE
  * Registry Metadata untuk modul konsultasi AI.
+ * Menggantikan Google Sheets sebagai penyimpanan utama metadata.
  */
 
 export const fetchConsultationsFromSupabase = async (
@@ -20,12 +21,12 @@ export const fetchConsultationsFromSupabase = async (
     .select('*', { count: 'exact' })
     .eq('collectionId', collectionId);
 
-  // Smart Search pada kolom search_all
+  // Smart Search pada kolom search_all (Generated Column)
   if (search) {
-    query = query.ilike('search_all', `%${search}%`);
+    query = query.ilike('search_all', `%${search.toLowerCase()}%`);
   }
 
-  // Sorting: Favorite dulu, lalu CreatedAt Desc
+  // Sorting: Favorite dulu, lalu CreatedAt Descending
   query = query.order('isFavorite', { ascending: false })
                .order('createdAt', { ascending: false });
 
@@ -52,7 +53,8 @@ export const upsertConsultationToSupabase = async (item: ConsultationItem): Prom
   if (!client) return false;
 
   // Sanitasi: Hapus search_all agar di-handle oleh trigger DB
-  const { search_all, ...cleanItem } = item as any;
+  // @ts-ignore
+  const { search_all, ...cleanItem } = item;
 
   const { error } = await client
     .from('consultations')

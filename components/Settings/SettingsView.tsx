@@ -13,9 +13,9 @@ import {
   InboxIcon,
   ListBulletIcon
 } from '@heroicons/react/24/outline';
-import { StickyNote, BookOpen, ListTodo } from 'lucide-react';
+import { StickyNote, BookOpen, ListTodo, Sparkles } from 'lucide-react';
 import { GAS_WEB_APP_URL } from '../../constants';
-import { initializeDatabase, initializeBrainstormingDatabase, initializePublicationDatabase, initializeConsultationDatabase } from '../../services/gasService';
+import { initializeDatabase, initializeBrainstormingDatabase, initializePublicationDatabase } from '../../services/gasService';
 import { initializeSharboxDatabase } from '../../services/SharboxService';
 import { showXeenapsAlert } from '../../utils/swalUtils';
 import { showXeenapsToast } from '../../utils/toastUtils';
@@ -23,13 +23,8 @@ import { showXeenapsToast } from '../../utils/toastUtils';
 const SettingsView: React.FC = () => {
   const isConfigured = !!GAS_WEB_APP_URL;
   const [isInitializing, setIsInitializing] = useState(false);
-  const [isInitializingNote, setIsInitializingNote] = useState(false);
   const [isInitializingBrain, setIsInitializingBrain] = useState(false);
   const [isInitializingPub, setIsInitializingPub] = useState(false);
-  const [isInitializingTeaching, setIsInitializingTeaching] = useState(false);
-  const [isInitializingCV, setIsInitializingCV] = useState(false);
-  const [isInitializingConsult, setIsInitializingConsult] = useState(false);
-  const [isInitializingReview, setIsInitializingReview] = useState(false);
   const [isInitializingSharbox, setIsInitializingSharbox] = useState(false);
 
   const SPREADSHEET_IDS = {
@@ -127,24 +122,8 @@ const SettingsView: React.FC = () => {
   };
 
   const handleInitConsultDatabase = async () => {
-    setIsInitializingConsult(true);
-    try {
-      const result = await initializeConsultationDatabase();
-      if (result.status === 'success') {
-        showXeenapsAlert({
-          icon: 'success',
-          title: 'CONSULTATION READY',
-          text: 'The Consultation registry sheet has been successfully initialized.',
-          confirmButtonText: 'GREAT'
-        });
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (err: any) {
-      showXeenapsAlert({ icon: 'error', title: 'SETUP FAILED', text: err.message || 'Check GAS connection.' });
-    } finally {
-      setIsInitializingConsult(false);
-    }
+    // Consultation migrated to Supabase
+    showXeenapsToast('success', 'Consultation Registry Managed by Supabase');
   };
 
   const handleInitReviewDatabase = async () => {
@@ -198,7 +177,7 @@ const SettingsView: React.FC = () => {
               disabled={isInitializing || !isConfigured}
               className="w-full py-2.5 bg-[#FED400] text-[#004A74] rounded-xl font-black uppercase tracking-widest text-[8px] flex items-center justify-center gap-2 hover:scale-105 transition-all disabled:opacity-50"
             >
-              {isInitializing ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
+              {isInitializing ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
               Initialize
             </button>
           </div>
@@ -246,7 +225,7 @@ const SettingsView: React.FC = () => {
               disabled={isInitializingBrain || !isConfigured}
               className="w-full py-2.5 bg-[#FED400] text-[#004A74] rounded-xl font-black uppercase tracking-widest text-[8px] flex items-center justify-center gap-2 hover:scale-105 transition-all disabled:opacity-50"
             >
-              {isInitializingBrain ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
+              {isInitializingBrain ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
               Initialize
             </button>
           </div>
@@ -261,7 +240,7 @@ const SettingsView: React.FC = () => {
               disabled={isInitializingPub || !isConfigured}
               className="w-full py-2.5 bg-white text-[#004A74] rounded-xl font-black uppercase tracking-widest text-[8px] flex items-center justify-center gap-2 hover:scale-105 transition-all disabled:opacity-50"
             >
-              {isInitializingPub ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
+              {isInitializingPub ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
               Initialize
             </button>
           </div>
@@ -271,14 +250,10 @@ const SettingsView: React.FC = () => {
               <ChatBubbleLeftRightIcon className="w-4 h-4 text-[#FED400]" />
               Consultation
             </h3>
-            <button 
-              onClick={handleInitConsultDatabase}
-              disabled={isInitializingConsult || !isConfigured}
-              className="w-full py-2.5 bg-[#FED400] text-[#004A74] rounded-xl font-black uppercase tracking-widest text-[8px] flex items-center justify-center gap-2 hover:scale-105 transition-all disabled:opacity-50"
-            >
-              {isInitializingConsult ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
-              Initialize
-            </button>
+            <div className="w-full py-2.5 bg-white/10 text-white rounded-xl font-black uppercase tracking-widest text-[8px] flex items-center justify-center gap-2 opacity-60">
+              <ShieldCheckIcon className="w-3 h-3" />
+              Supabase Powered
+            </div>
           </div>
 
           <div className="p-4 bg-gradient-to-br from-[#004A74] to-[#003859] rounded-[2rem] text-white shadow-xl relative overflow-hidden group">

@@ -4,6 +4,7 @@ import { NoteItem } from '../types';
 /**
  * XEENAPS NOTEBOOK SUPABASE SERVICE
  * Registry Metadata untuk modul Notebook.
+ * Menggantikan Google Sheets sebagai penyimpanan utama metadata.
  */
 
 export const fetchNotesPaginatedFromSupabase = async (
@@ -24,21 +25,22 @@ export const fetchNotesPaginatedFromSupabase = async (
   // 1. Filter by Collection ID
   // SPECIAL TOKEN: __INDEPENDENT__ means collectionId is empty/null
   if (collectionId === "__INDEPENDENT__") {
+    // Syntax .or() untuk menangani null atau string kosong
     query = query.or('collectionId.is.null,collectionId.eq.""');
   } else if (collectionId) {
     query = query.eq('collectionId', collectionId);
   }
 
-  // 2. Smart Search (Server-side via search_all)
+  // 2. Smart Search (Server-side via search_all generated column)
   if (search) {
-    query = query.ilike('search_all', `%${search}%`);
+    query = query.ilike('search_all', `%${search.toLowerCase()}%`);
   }
 
-  // 3. Sorting (Default: Favorite first handled by UI or Secondary Sort if needed)
-  // Here we follow the requested sort key
+  // 3. Sorting
   if (sortKey === 'isFavorite') {
-     query = query.order('isFavorite', { ascending: false });
+      query = query.order('isFavorite', { ascending: false });
   }
+  // Primary Sort
   query = query.order(sortKey, { ascending: sortDir === 'asc' });
 
   // 4. Pagination
@@ -64,7 +66,8 @@ export const upsertNoteToSupabase = async (item: NoteItem): Promise<boolean> => 
   if (!client) return false;
 
   // Sanitasi: Hapus search_all agar di-handle oleh trigger DB
-  const { search_all, ...cleanItem } = item as any;
+  // @ts-ignore
+  const { search_all, ...cleanItem } = item;
 
   const { error } = await client
     .from('notes')

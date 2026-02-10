@@ -20,7 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_consultations_search_all ON public.consultations 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.consultations ENABLE ROW LEVEL SECURITY;
 
--- Kebijakan Akses Publik (Bisa disesuaikan nanti untuk auth user)
+-- Kebijakan Akses Publik
 CREATE POLICY "Public Access Consultations" ON public.consultations FOR ALL USING (true);
 
 -- Fungsi Trigger untuk update otomatis search_all
