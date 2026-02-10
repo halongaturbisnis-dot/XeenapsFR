@@ -1,7 +1,7 @@
 
 /**
- * XEENAPS PKM - GLOBAL LITERATURE SEARCH PROXY (OPENALEX & OPEN LIBRARY EDITION)
- * Memproses pencarian ke OpenAlex dan Open Library (bypass CORS) serta terjemahan via Lingva.
+ * XEENAPS PKM - GLOBAL LITERATURE SEARCH PROXY (OPENALEX, CROSSREF & CORE EDITION)
+ * Memproses pencarian ke OpenAlex, Crossref, dan CORE (bypass CORS) serta terjemahan via Lingva.
  */
 
 function handleGlobalArticleSearch(params) {
@@ -20,47 +20,154 @@ function handleGlobalArticleSearch(params) {
     console.log("Lingva Engine Error: " + e.toString());
   }
 
-  // 2. PENYUSUNAN PARAMETER OPENALEX
+  // 2. PENYUSUNAN PARAMETER
   let limit = params.limit || 12;
-  let openAlexUrl = `https://api.openalex.org/works?search=${encodeURIComponent(searchTerms)}&per_page=${limit}`;
   
+  // A. OPENALEX REQUEST
+  let openAlexUrl = `https://api.openalex.org/works?search=${encodeURIComponent(searchTerms)}&per_page=${limit}`;
   if (yearStart && yearEnd) {
     openAlexUrl += `&filter=publication_year:${yearStart}-${yearEnd}`;
   } else if (yearStart) {
     openAlexUrl += `&filter=publication_year:${yearStart}-2026`;
   }
+  
+  const reqOpenAlex = {
+    url: openAlexUrl,
+    muteHttpExceptions: true,
+    headers: { "Accept": "application/json" }
+  };
+
+  // B. CROSSREF REQUEST
+  // Crossref uses 'query.bibliographic' for general search and 'filter' for dates
+  let crossrefUrl = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(searchTerms)}&rows=${limit}&sort=score&select=DOI,title,author,published-print,published-online,container-title,abstract,is-referenced-by-count,URL`;
+  
+  if (yearStart) {
+    let dateFilter = `from-pub-date:${yearStart}-01-01`;
+    if (yearEnd) {
+      dateFilter += `,until-pub-date:${yearEnd}-12-31`;
+    }
+    crossrefUrl += `&filter=${dateFilter}`;
+  }
+
+  const reqCrossref = {
+    url: crossrefUrl,
+    muteHttpExceptions: true
+  };
+
+  // C. CORE API REQUEST (NEW)
+  const coreKey = getCoreApiKey();
+  let reqCore = null;
+  
+  if (coreKey) {
+    let corePayload = {
+      "q": searchTerms,
+      "limit": limit
+    };
+    if (yearStart) corePayload["year_from"] = parseInt(yearStart);
+    if (yearEnd) corePayload["year_to"] = parseInt(yearEnd);
+
+    reqCore = {
+      url: "https://api.core.ac.uk/v3/search/works",
+      method: "POST",
+      contentType: "application/json",
+      headers: { "Authorization": "Bearer " + coreKey },
+      payload: JSON.stringify(corePayload),
+      muteHttpExceptions: true
+    };
+  }
 
   try {
-    const response = UrlFetchApp.fetch(openAlexUrl, { 
-      muteHttpExceptions: true,
-      headers: { "Accept": "application/json" }
-    });
+    // 3. PARALLEL FETCHING
+    const requests = [reqOpenAlex, reqCrossref];
+    if (reqCore) requests.push(reqCore);
+
+    const responses = UrlFetchApp.fetchAll(requests);
     
-    const responseCode = response.getResponseCode();
-    if (responseCode !== 200) {
-      return { 
-        status: 'error', 
-        message: 'OpenAlex API Error (' + responseCode + '): ' + response.getContentText() 
-      };
+    // --- PROCESS OPENALEX RESULTS ---
+    let oaResults = [];
+    if (responses[0].getResponseCode() === 200) {
+      const resultOA = JSON.parse(responses[0].getContentText());
+      oaResults = (resultOA.results || []).map(item => ({
+        paperId: item.id,
+        title: item.display_name || "Untitled",
+        authors: (item.authorships || []).map(a => ({ name: a.author.display_name })),
+        year: item.publication_year || null,
+        doi: item.doi ? item.doi.replace('https://doi.org/', '') : "",
+        url: item.doi || item.ids?.openalex || "",
+        venue: item.primary_location?.source?.display_name || "Academic Source",
+        citationCount: item.cited_by_count || 0,
+        abstract: "" 
+      }));
     }
 
-    const result = JSON.parse(response.getContentText());
+    // --- PROCESS CROSSREF RESULTS ---
+    let crResults = [];
+    if (responses[1].getResponseCode() === 200) {
+      try {
+        const resultCR = JSON.parse(responses[1].getContentText());
+        if (resultCR.message && resultCR.message.items) {
+          crResults = resultCR.message.items.map(mapCrossrefData);
+        }
+      } catch (e) {
+        console.log("Crossref parse error: " + e.toString());
+      }
+    }
+
+    // --- PROCESS CORE RESULTS (NEW) ---
+    let coreResults = [];
+    // CORE response is at index 2 if reqCore exists
+    if (reqCore && responses[2] && responses[2].getResponseCode() === 200) {
+      try {
+        const resultCore = JSON.parse(responses[2].getContentText());
+        if (resultCore.results) {
+          coreResults = resultCore.results.map(mapCoreData);
+        }
+      } catch (e) {
+        console.log("CORE parse error: " + e.toString());
+      }
+    }
+
+    // 4. SMART AGGREGATION & DEDUPLICATION
+    // Priority: OpenAlex (Base) -> CORE (Inject PDF/Add Unique) -> Crossref (Add Unique)
     
-    const mappedData = (result.results || []).map(item => ({
-      paperId: item.id,
-      title: item.display_name || "Untitled",
-      authors: (item.authorships || []).map(a => ({ name: a.author.display_name })),
-      year: item.publication_year || null,
-      doi: item.doi ? item.doi.replace('https://doi.org/', '') : "",
-      url: item.doi || item.ids?.openalex || "",
-      venue: item.primary_location?.source?.display_name || "Academic Source",
-      citationCount: item.cited_by_count || 0,
-      abstract: "" 
-    }));
+    const finalResults = [...oaResults];
+    const existingDois = new Map(); // Map DOI to Item object for updates
+    
+    // Initialize map with OpenAlex items
+    oaResults.forEach(item => {
+      if (item.doi) existingDois.set(item.doi.toLowerCase(), item);
+    });
+
+    // Merge CORE: Add unique or inject PDF link to existing
+    coreResults.forEach(item => {
+      if (item.doi && existingDois.has(item.doi.toLowerCase())) {
+        // Item exists in OpenAlex. Check if CORE has a PDF link to offer.
+        const existingItem = existingDois.get(item.doi.toLowerCase());
+        // If CORE has a specific download URL (often PDF), upgrade the URL
+        if (item.url && item.url.indexOf('core.ac.uk/download') > -1) {
+           existingItem.url = item.url; 
+        }
+      } else {
+        // Unique item from CORE
+        finalResults.push(item);
+        if (item.doi) existingDois.set(item.doi.toLowerCase(), item);
+      }
+    });
+
+    // Merge Crossref: Add only unique
+    crResults.forEach(item => {
+      if (item.doi && !existingDois.has(item.doi.toLowerCase())) {
+        finalResults.push(item);
+        existingDois.set(item.doi.toLowerCase(), item);
+      } else if (!item.doi) {
+        // Items without DOI (rare/fallback)
+        finalResults.push(item);
+      }
+    });
 
     return { 
       status: 'success', 
-      data: mappedData,
+      data: finalResults,
       translatedQuery: searchTerms !== query ? searchTerms : null
     };
   } catch (err) {
@@ -185,6 +292,84 @@ function handleGlobalBookSearch(params) {
 }
 
 // --- HELPER MAPPERS ---
+
+function getCoreApiKey() {
+  try {
+    // Config global ada di file Config.gs
+    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEETS.KEYS);
+    const sheet = ss.getSheetByName("Core");
+    if (!sheet) return null;
+    return sheet.getRange("A1").getValue();
+  } catch (e) {
+    return null;
+  }
+}
+
+function mapCoreData(item) {
+  const title = item.title || "Untitled";
+  const authors = (item.authors || []).map(a => ({ name: a.name }));
+  const year = item.yearPublished || null;
+  const doi = item.doi || "";
+  const abstract = item.abstract || "";
+  
+  // Prefer downloadUrl (PDF) or generic link
+  const url = item.downloadUrl || (item.links && item.links.length > 0 ? item.links[0] : "") || (doi ? `https://doi.org/${doi}` : "");
+  
+  // Try to find journal name from various fields
+  let venue = "CORE Repository";
+  if (item.journals && item.journals.length > 0) venue = item.journals[0].title || venue;
+  else if (item.publisher) venue = item.publisher;
+
+  return {
+    paperId: `core_${item.id}`,
+    title: title,
+    authors: authors,
+    year: year,
+    doi: doi,
+    url: url,
+    venue: venue,
+    citationCount: 0, // CORE search API standard response might not include citation count directly in list view
+    abstract: abstract,
+    // Helper property for deduplication logic (not part of final LiteratureArticle interface)
+    pdfUrl: item.downloadUrl
+  };
+}
+
+function mapCrossrefData(item) {
+  // Title: Crossref returns array
+  const title = (item.title && item.title.length > 0) ? item.title[0] : "Untitled";
+  
+  // Authors: Crossref format { given: "...", family: "..." }
+  const authors = (item.author || []).map(a => ({
+    name: (a.given ? a.given + " " : "") + (a.family || "")
+  }));
+
+  // Year: Check published-print or published-online
+  let year = null;
+  if (item['published-print'] && item['published-print']['date-parts']) {
+    year = item['published-print']['date-parts'][0][0];
+  } else if (item['published-online'] && item['published-online']['date-parts']) {
+    year = item['published-online']['date-parts'][0][0];
+  }
+
+  // Abstract: Clean XML tags if present
+  let abstract = item.abstract || "";
+  if (abstract) {
+    abstract = abstract.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  return {
+    paperId: item.DOI || `cr_${Math.random().toString(36).substr(2, 9)}`,
+    title: title,
+    authors: authors,
+    year: year,
+    doi: item.DOI || "",
+    url: item.URL || (item.DOI ? `https://doi.org/${item.DOI}` : ""),
+    venue: (item['container-title'] && item['container-title'].length > 0) ? item['container-title'][0] : "Crossref Source",
+    citationCount: item['is-referenced-by-count'] || 0,
+    abstract: abstract
+  };
+}
 
 function mapGoogleBooksData(item) {
   const info = item.volumeInfo || {};

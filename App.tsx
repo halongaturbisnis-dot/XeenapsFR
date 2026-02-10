@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 // @ts-ignore - Resolving TS error for missing exported members in some environments
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
@@ -26,6 +27,7 @@ import NotebookMain from './components/Notebook/NotebookMain';
 import AllReview from './components/Research/LiteratureReview/AllReview';
 import ReviewDetail from './components/Research/LiteratureReview/ReviewDetail';
 import DashboardMain from './components/Dashboard/DashboardMain';
+import ReloadPrompt from './components/Layout/ReloadPrompt';
 // Placeholder for the upcoming modules
 const ActivityMain = React.lazy(() => import('./components/Activities/ActivityMain'));
 const TeachingMain = React.lazy(() => import('./components/Teaching/TeachingMain'));
@@ -251,6 +253,7 @@ const App: React.FC = () => {
   return (
     <Router>
       <ScrollToTop />
+      <ReloadPrompt />
       <div className={`flex min-h-screen bg-white text-[#004A74] ${isLoading ? 'pointer-events-none select-none' : ''}`}>
         {isMobileSidebarOpen && (
           <div 

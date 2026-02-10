@@ -877,7 +877,7 @@ const LibraryForm: React.FC<LibraryFormProps> = ({ onComplete, items = [] }) => 
 
           <div className="pt-10 flex flex-col md:flex-row gap-4">
             <button type="button" onClick={() => navigate('/')} disabled={isFormDisabled} className="w-full md:px-10 py-5 bg-gray-100 text-gray-400 rounded-[1.5rem] font-black text-sm uppercase">Cancel</button>
-            <button type="submit" disabled={isFormDisabled} className="w-full py-5 bg-[#004A74] text-white rounded-[1.5rem] font-black text-sm flex items-center justify-center gap-3 uppercase">{isSubmitting ? 'REGISTERING...' : isExtracting ? 'ANALYZING...' : <><CheckIcon className="w-5 h-5" /> Register Item</>}</button>
+            <button type="submit" disabled={isFormDisabled} className="w-full py-5 bg-[#004A74] text-white rounded-[1.5rem] font-black text-sm flex items-center justify-center gap-3 uppercase">{isSubmitting ? 'REGISTERING...' : isExtracting ? 'ANALYZING...' : <> Register Item</>}</button>
           </div>
         </form>
       </FormContentArea>
