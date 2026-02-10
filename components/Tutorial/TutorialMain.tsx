@@ -54,7 +54,7 @@ const TutorialMain: React.FC = () => {
            </div>
            <div>
               <h2 className="text-2xl font-black text-[#004A74] uppercase tracking-tight">TUTORIAL</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Platform Guidance & Help</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Application Guidance & Help</p>
            </div>
         </div>
       </div>
