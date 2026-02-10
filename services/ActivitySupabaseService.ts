@@ -13,7 +13,7 @@ export const fetchActivitiesPaginatedFromSupabase = async (
   startDate: string = "",
   endDate: string = "",
   type: string = "All",
-  sortKey: string = "startDate", // Default sort by Event Date usually
+  sortKey: string = "startDate", 
   sortDir: string = "desc"
 ): Promise<{ items: ActivityItem[], totalCount: number }> => {
   const client = getSupabase();
@@ -33,20 +33,17 @@ export const fetchActivitiesPaginatedFromSupabase = async (
     query = query.ilike('search_all', `%${search.toLowerCase()}%`);
   }
 
-  // 3. Date Range Filter (Based on startDate column)
+  // 3. Date Range Filter
   if (startDate) {
     query = query.gte('startDate', startDate);
   }
   if (endDate) {
-    query = query.lte('startDate', endDate); // Logic: Activities starting before or on end date
+    query = query.lte('startDate', endDate);
   }
 
   // 4. Sorting
-  // Special handling: Favorite usually pinned to top, handled by sortKey priority or client side.
-  // Standard sort:
   if (sortKey === 'isFavorite') {
       query = query.order('isFavorite', { ascending: false });
-      // Secondary sort
       query = query.order('startDate', { ascending: false });
   } else {
       query = query.order(sortKey, { ascending: sortDir === 'asc' });
@@ -74,18 +71,47 @@ export const upsertActivityToSupabase = async (item: ActivityItem): Promise<bool
   const client = getSupabase();
   if (!client) return false;
 
-  // Sanitasi: Hapus search_all agar di-handle oleh trigger DB
+  // --- DEEP SANITIZATION PAYLOAD ---
+  // Mencegah Error 406/500 akibat format JSONB yang salah
+  
+  // 1. Pisahkan kolom generated (search_all)
   const { search_all, ...cleanItem } = item as any;
 
-  const { error } = await client
-    .from('activities')
-    .upsert(cleanItem);
+  // 2. Pastikan vault_items adalah Array valid (Bukan null/undefined)
+  const vaultItemsSafe = Array.isArray(cleanItem.vault_items) 
+    ? cleanItem.vault_items 
+    : [];
 
-  if (error) {
-    console.error("Supabase Activity Upsert Error:", error);
+  // 3. Construct Payload yang Aman
+  const payload = {
+    ...cleanItem,
+    // Paksa tipe data yang benar
+    vault_items: vaultItemsSafe, 
+    // Pastikan field opsional tidak undefined (gunakan null jika kosong agar SQL valid)
+    organizer: cleanItem.organizer || null,
+    location: cleanItem.location || null,
+    certificateNumber: cleanItem.certificateNumber || null,
+    vaultJsonId: cleanItem.vaultJsonId || null, 
+    certificateFileId: cleanItem.certificateFileId || null,
+    certificateNodeUrl: cleanItem.certificateNodeUrl || null,
+    storageNodeUrl: cleanItem.storageNodeUrl || null,
+    updatedAt: new Date().toISOString()
+  };
+
+  try {
+    const { error } = await client
+      .from('activities')
+      .upsert(payload, { onConflict: 'id' }); // Explicit conflict target
+
+    if (error) {
+      console.error("Supabase Activity Upsert Error Detail:", JSON.stringify(error, null, 2));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("Supabase Unexpected Error:", err);
     return false;
   }
-  return true;
 };
 
 export const deleteActivityFromSupabase = async (id: string): Promise<boolean> => {
@@ -104,8 +130,6 @@ export const deleteActivityFromSupabase = async (id: string): Promise<boolean> =
   return true;
 };
 
-
-// Helper to get single item for file cleanup
 export const fetchActivityByIdFromSupabase = async (id: string): Promise<ActivityItem | null> => {
   const client = getSupabase();
   if (!client) return null;

@@ -55,23 +55,14 @@ const DocumentationVault: React.FC = () => {
   const [linkQueue, setLinkQueue] = useState<LinkQueueItem[]>([{ url: '', label: '' }]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Recovery logic if metadata is missing (e.g. direct URL access)
+  // Recovery logic if metadata is missing
   useEffect(() => {
     const loadMetadata = async () => {
       if (!metadata && urlActivityId) {
         setIsLoading(true);
-        try {
-           // Fetch from Supabase using the existing listing service (fallback logic)
-           // ideally we would have a fetchById service, but for now we reuse what we have
-           // or assume the main list fetches it. 
-           // For simplicity in this refactor, we simulate a fetch if needed, 
-           // but since we are modifying the architecture, let's assume standard nav flow.
-           // If direct access is critical, one should implement fetchActivityById in service.
-        } finally {
-           setIsLoading(false);
-        }
+        // Fallback logic could be added here to fetch from Supabase by ID if needed
+        setIsLoading(false);
       } else if (metadata) {
-         // Sync items state with metadata if it updates
          setItems(metadata.vault_items || []);
       }
     };
@@ -82,18 +73,29 @@ const DocumentationVault: React.FC = () => {
   const handleSyncVault = async (newItems: ActivityVaultItem[]) => {
     if (!metadata || !urlActivityId) return;
     
+    // Ensure data integrity
+    const cleanItems = newItems.filter(i => i && !i.fileId?.startsWith('optimistic_'));
+
     const updatedMetadata: ActivityItem = { 
       ...metadata, 
-      vault_items: newItems,
+      vault_items: cleanItems,
       updatedAt: new Date().toISOString()
     };
     
-    // 1. Optimistic Update
+    // 1. Optimistic Update (UI Only)
     setMetadata(updatedMetadata);
-    setItems(newItems);
+    setItems(cleanItems);
 
-    // 2. Persist to Supabase (Single Source of Truth)
-    await saveActivity(updatedMetadata); 
+    // 2. Persist to Supabase
+    try {
+      const success = await saveActivity(updatedMetadata);
+      if (!success) {
+        showXeenapsToast('error', 'Registry sync failed. Check connection.');
+      }
+    } catch (e) {
+      console.error("Sync Error", e);
+      showXeenapsToast('error', 'Network error during sync.');
+    }
   };
 
   // --- FILE UPLOAD LOGIC ---
@@ -114,23 +116,25 @@ const DocumentationVault: React.FC = () => {
     setIsProcessing(true);
     setIsFileModalOpen(false);
 
-    // 1. OPTIMISTIC UPDATE: Add placeholder items to UI immediately
+    // 1. OPTIMISTIC UPDATE
     const optimisticBatchId = crypto.randomUUID();
     const optimisticItems: ActivityVaultItem[] = fileQueue.map((q, idx) => ({
       type: 'FILE',
       label: q.label,
       mimeType: q.file.type,
       fileId: `optimistic_${optimisticBatchId}_${idx}_${q.previewUrl || 'no-preview'}`,
-      nodeUrl: metadata?.storageNodeUrl // Use legacy node url as placeholder or current script url
+      nodeUrl: metadata?.storageNodeUrl
     }));
     
-    // Instant feedback
-    const pendingItems = [...items, ...optimisticItems];
-    setItems(pendingItems);
+    // Backup original state in case of failure
+    const originalItems = [...items];
+    setItems([...items, ...optimisticItems]);
 
     // 2. BACKGROUND UPLOAD PROCESS
     try {
       const uploadedItems: ActivityVaultItem[] = [];
+      let failureCount = 0;
+
       for (const q of fileQueue) {
         const result = await uploadVaultFile(q.file);
         if (result) {
@@ -141,17 +145,30 @@ const DocumentationVault: React.FC = () => {
             label: q.label,
             mimeType: q.file.type
           });
+        } else {
+          failureCount++;
         }
       }
 
-      // Finalize: Replace optimistic items with real data
-      const finalGallery = [...items, ...uploadedItems];
-      await handleSyncVault(finalGallery);
+      if (uploadedItems.length > 0) {
+        // Replace optimistic items with real data
+        const finalGallery = [...originalItems, ...uploadedItems];
+        await handleSyncVault(finalGallery);
+        
+        if (failureCount > 0) {
+           showXeenapsToast('warning', `${failureCount} files failed to upload due to network.`);
+        } else {
+           showXeenapsToast('success', 'Documents secured & registry updated.');
+        }
+      } else {
+        // All failed
+        throw new Error("All uploads failed");
+      }
 
     } catch (err) {
-      // Rollback optimistic on failure
-      setItems(items);
-      showXeenapsToast('error', 'Batch upload synchronization failed');
+      // Rollback on complete failure
+      setItems(originalItems);
+      showXeenapsToast('error', 'Upload failed. Please check your internet connection.');
     } finally {
       setFileQueue([]);
       setIsProcessing(false);
@@ -164,8 +181,6 @@ const DocumentationVault: React.FC = () => {
     if (validLinks.length === 0) return;
 
     setIsLinkModalOpen(false);
-    
-    // 1. Prepare new items
     const newVaultItems: ActivityVaultItem[] = validLinks.map(l => ({
       type: 'LINK',
       url: l.url,
@@ -173,14 +188,7 @@ const DocumentationVault: React.FC = () => {
     }));
 
     const updatedGallery = [...items, ...newVaultItems];
-    
-    // 2. Sync
-    try {
-      await handleSyncVault(updatedGallery);
-    } catch (err) {
-      showXeenapsToast('error', 'Link synchronization failed');
-    }
-    
+    await handleSyncVault(updatedGallery);
     setLinkQueue([{ url: '', label: '' }]);
   };
 
@@ -196,13 +204,14 @@ const DocumentationVault: React.FC = () => {
       const prevItems = [...items];
       const newItems = items.filter((_, i) => i !== idx);
       
-      // Optimistic Update
+      // Update UI First
       setItems(newItems); 
       
       try {
         // Physical Cleanup (Fire & Forget)
         if (item.type === 'FILE' && item.fileId && item.nodeUrl && !item.fileId.startsWith('optimistic_')) {
-          deleteRemoteFile(item.fileId, item.nodeUrl); 
+           // We don't await this to speed up UI, but we log errors
+           deleteRemoteFile(item.fileId, item.nodeUrl).catch(e => console.warn("Cleanup warning:", e));
         }
         
         // Metadata Sync
