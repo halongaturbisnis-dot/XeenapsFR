@@ -27,7 +27,7 @@ import NotebookMain from './components/Notebook/NotebookMain';
 import AllReview from './components/Research/LiteratureReview/AllReview';
 import ReviewDetail from './components/Research/LiteratureReview/ReviewDetail';
 import DashboardMain from './components/Dashboard/DashboardMain';
-import ReloadPrompt from './components/Layout/ReloadPrompt';
+
 // Placeholder for the upcoming modules
 const ActivityMain = React.lazy(() => import('./components/Activities/ActivityMain'));
 const TeachingMain = React.lazy(() => import('./components/Teaching/TeachingMain'));
@@ -253,7 +253,6 @@ const App: React.FC = () => {
   return (
     <Router>
       <ScrollToTop />
-      <ReloadPrompt />
       <div className={`flex min-h-screen bg-white text-[#004A74] ${isLoading ? 'pointer-events-none select-none' : ''}`}>
         {isMobileSidebarOpen && (
           <div 
@@ -290,7 +289,13 @@ const App: React.FC = () => {
                     />
                   } 
                 />
-                <Route path="/" element={<LibraryMain items={items} isLoading={isLoading} onRefresh={loadData} globalSearch={searchQuery} isMobileSidebarOpen={isMobileSidebarOpen} />} />
+                
+                {/* --- ROOT REDIRECT --- */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                
+                {/* --- LIBRARY MAIN MOVED --- */}
+                <Route path="/library" element={<LibraryMain items={items} isLoading={isLoading} onRefresh={loadData} globalSearch={searchQuery} isMobileSidebarOpen={isMobileSidebarOpen} />} />
+                
                 <Route path="/favorite" element={<LibraryMain items={items} isLoading={isLoading} onRefresh={loadData} globalSearch={searchQuery} isMobileSidebarOpen={isMobileSidebarOpen} />} />
                 <Route path="/bookmark" element={<LibraryMain items={items} isLoading={isLoading} onRefresh={loadData} globalSearch={searchQuery} isMobileSidebarOpen={isMobileSidebarOpen} />} />
                 

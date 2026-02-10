@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 // @ts-ignore - Resolving TS error for missing exported members
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
@@ -51,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onMobileClose }) => {
   const navItemsBlock1 = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutGrid },
     { name: 'Collaboration', path: '/collaboration', icon: Handshake },
-    { name: 'Library', path: '/', icon: LibraryBig },
+    { name: 'Library', path: '/library', icon: LibraryBig },
     { name: 'Favorite', path: '/favorite', icon: Star },
     { name: 'Bookmark', path: '/bookmark', icon: Bookmark },
   ];
