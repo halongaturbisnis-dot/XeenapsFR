@@ -34,7 +34,7 @@ export default defineConfig({
             src: 'https://lh3.googleusercontent.com/d/1ZpVAXWGLDP2C42Fct0bisloaQLf2095_',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
           }
         ]
       },
