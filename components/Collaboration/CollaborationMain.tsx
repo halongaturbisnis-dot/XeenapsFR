@@ -77,8 +77,8 @@ const CollaborationMain: React.FC = () => {
               <Handshake size={24} />
            </div>
            <div>
-              <h2 className="text-2xl font-black text-[#004A74] uppercase tracking-tight">Promo</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Partner Promotion</p>
+              <h2 className="text-2xl font-black text-[#004A74] uppercase tracking-tight">Promotion</h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">From Curated Partners</p>
            </div>
         </div>
       </div>
