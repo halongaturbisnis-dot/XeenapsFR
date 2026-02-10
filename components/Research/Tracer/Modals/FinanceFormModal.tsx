@@ -19,13 +19,12 @@ import {
   ArrowUpCircle, 
   ArrowDownCircle,
   PlusCircle,
-  Link as LinkIcon
+  Link as LinkIcon,
+  ExternalLink
 } from 'lucide-react';
 import { FormField } from '../../../Common/FormComponents';
 import { showXeenapsDeleteConfirm } from '../../../../utils/confirmUtils';
 import { showXeenapsToast } from '../../../../utils/toastUtils';
-import Swal from 'sweetalert2';
-import { XEENAPS_SWAL_CONFIG } from '../../../../utils/swalUtils';
 
 interface FinanceFormModalProps {
   projectId: string;
@@ -96,33 +95,8 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
 
   const formattedAmount = new Intl.NumberFormat('id-ID').format(parseInt(amountStr) || 0);
 
-  const handleAddLink = async () => {
-    const { value: formValues } = await Swal.fire({
-      title: 'ADD LINK EVIDENCE',
-      html:
-        '<input id="swal-input1" class="swal2-input" placeholder="Label (e.g. Invoice URL)">' +
-        '<input id="swal-input2" class="swal2-input" placeholder="https://...">',
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: 'ADD',
-      cancelButtonText: 'CANCEL',
-      ...XEENAPS_SWAL_CONFIG,
-      preConfirm: () => {
-        return [
-          (document.getElementById('swal-input1') as HTMLInputElement).value,
-          (document.getElementById('swal-input2') as HTMLInputElement).value
-        ]
-      }
-    });
-  
-    if (formValues && formValues[0] && formValues[1]) {
-      const newLink: TracerFinanceAttachment = {
-        type: 'LINK',
-        label: formValues[0],
-        url: formValues[1]
-      };
-      setContent(prev => ({ attachments: [...prev.attachments, newLink] }));
-    }
+  const handleAddLink = () => {
+    setContent(prev => ({ ...prev, attachments: [...prev.attachments, { type: 'LINK', label: '', url: '' }] }));
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -313,27 +287,78 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
                    {content.attachments.map((at, idx) => {
                       const isPending = at.fileId?.startsWith('pending_');
                       const isImage = at.mimeType?.startsWith('image/') || (at.url && at.url.includes('lh3.googleusercontent'));
-                      const viewUrl = at.fileId ? (isImage && !isPending ? `https://lh3.googleusercontent.com/d/${at.fileId}` : at.url || `https://drive.google.com/file/d/${at.fileId}/view`) : at.url;
+                      
+                      const handleView = () => {
+                        if (isPending) return;
+                        let targetUrl = at.url;
+                        if (at.type === 'FILE' && at.fileId) {
+                          targetUrl = isImage 
+                            ? `https://lh3.googleusercontent.com/d/${at.fileId}`
+                            : `https://drive.google.com/file/d/${at.fileId}/view`;
+                        }
+                        if (targetUrl) window.open(targetUrl, '_blank');
+                      };
 
                       return (
-                        <div key={idx} className="p-3 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3 relative group">
-                           <div className="w-10 h-10 bg-white rounded-xl overflow-hidden flex items-center justify-center shrink-0 border border-gray-100 relative">
-                              {isImage && at.url ? <img src={at.url} className="w-full h-full object-cover" /> : at.type === 'LINK' ? <Globe size={16} className="text-gray-300" /> : <FileIcon size={16} className="text-gray-300" />}
+                        <div key={idx} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-4 group animate-in slide-in-from-bottom-2 relative overflow-hidden">
+                           <div 
+                              onClick={handleView}
+                              className={`w-12 h-12 bg-white rounded-xl flex items-center justify-center text-[#004A74]/30 shadow-sm overflow-hidden shrink-0 relative ${!isPending ? 'cursor-pointer hover:bg-gray-100 transition-all' : ''}`}
+                            >
+                              {isImage ? <img src={at.url} className="w-full h-full object-cover" /> : at.type === 'LINK' ? <Globe size={18} /> : <FileIcon size={18} />}
                               {isPending && (
                                  <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-[1px]">
                                     <Loader2 size={12} className="animate-spin text-[#004A74]" />
                                  </div>
                               )}
-                           </div>
-                           <p className="text-[9px] font-bold text-[#004A74] uppercase truncate flex-1">{at.label}</p>
-                           <div className="flex items-center gap-1">
-                              {!isPending && viewUrl && (
-                                <button type="button" onClick={() => window.open(viewUrl, '_blank')} className="p-1.5 text-blue-500 hover:bg-white rounded-lg transition-all"><Eye size={14} /></button>
-                              )}
-                              {!isViewOnly && (
-                                <button type="button" onClick={() => handleRemoveAttachment(idx)} className="p-1.5 text-red-300 hover:text-red-500 rounded-lg transition-all"><Trash2 size={14} /></button>
+                              {!isPending && (
+                                <div className="absolute inset-0 bg-[#004A74]/10 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                                  <Eye size={12} className="text-[#004A74]" />
+                                </div>
                               )}
                            </div>
+
+                           <div className="flex-1 min-w-0 space-y-1">
+                              <input 
+                                className="w-full bg-transparent border-none p-0 text-[10px] font-black text-[#004A74] uppercase outline-none" 
+                                placeholder="LABEL..." 
+                                value={at.label} 
+                                onChange={e => {
+                                  const newAt = [...content.attachments];
+                                  newAt[idx].label = e.target.value;
+                                  setContent({...content, attachments: newAt});
+                                }} 
+                                disabled={isViewOnly}
+                              />
+                              {at.type === 'LINK' ? (
+                                <input 
+                                  className="w-full bg-transparent border-none p-0 text-[9px] font-medium text-blue-500 underline outline-none" 
+                                  placeholder="https://..." 
+                                  value={at.url} 
+                                  onChange={e => {
+                                    const newAt = [...content.attachments];
+                                    newAt[idx].url = e.target.value;
+                                    setContent({...content, attachments: newAt});
+                                  }} 
+                                  disabled={isViewOnly}
+                                />
+                              ) : (
+                                <div className="flex items-center justify-between pr-2">
+                                  <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{at.type}</span>
+                                  {!isPending && (
+                                    <button type="button" onClick={handleView} className="text-[#004A74]/40 hover:text-[#004A74] transition-all">
+                                      <ExternalLink size={10} />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                           </div>
+                           
+                           {!isViewOnly && (
+                             <button type="button" onClick={() => handleRemoveAttachment(idx)} className="p-2 text-red-300 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100">
+                               <Trash2 size={16} />
+                             </button>
+                           )}
                         </div>
                       );
                    })}
