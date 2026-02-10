@@ -1,105 +1,65 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-// @ts-ignore
-import { useNavigate, useLocation } from 'react-router-dom';
-// Fix: Added missing SupportingData import from types to resolve the error on line 413
-import { LibraryItem, PubInfo, Identifiers, SupportingData } from '../../types';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { LibraryItem, LibraryType, FileFormat, SourceType } from '../../types';
 import { 
   XMarkIcon, 
-  ArrowLeftIcon,
-  EyeIcon,
-  BookmarkIcon,
-  StarIcon,
-  EllipsisVerticalIcon,
-  PresentationChartBarIcon,
-  ClipboardDocumentListIcon,
-  ChatBubbleBottomCenterTextIcon,
-  ShareIcon,
-  AcademicCapIcon,
-  LinkIcon,
-  VideoCameraIcon,
-  ArrowTopRightOnSquareIcon,
-  DocumentDuplicateIcon,
+  ArrowLeftIcon, 
+  BookOpenIcon, 
+  LinkIcon, 
+  TagIcon,
+  TrashIcon,
+  PencilIcon,
+  ChatBubbleLeftRightIcon,
   SparklesIcon,
+  PresentationChartBarIcon,
+  AcademicCapIcon,
+  ShareIcon,
+  CloudArrowUpIcon,
+  DocumentTextIcon,
+  CheckBadgeIcon,
+  GlobeAltIcon,
   LightBulbIcon,
+  ArrowTopRightOnSquareIcon,
+  StarIcon,
+  BookmarkIcon,
   ClipboardDocumentCheckIcon,
   ExclamationTriangleIcon,
-  BookOpenIcon,
-  HashtagIcon,
-  TagIcon,
-  BeakerIcon,
-  ClockIcon,
-  ArrowPathIcon,
-  PencilIcon,
-  TrashIcon,
-  CheckIcon,
-  LanguageIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleBottomCenterTextIcon,
+  VideoCameraIcon,
+  ClipboardDocumentListIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarSolid, BookmarkIcon as BookmarkSolid } from '@heroicons/react/24/solid';
 import { 
-  BookmarkIcon as BookmarkSolid, 
-  StarIcon as StarSolid
-} from '@heroicons/react/24/solid';
+  fetchFileContent, 
+  generateCitations, 
+  generateInsight, 
+  translateInsightSection
+} from '../../services/gasService';
 import { 
-  StickyNote, 
-  Share2, 
-  Target, 
-  BookOpenCheck, 
-  Presentation,
-  ListTodo,
-  NotebookPen,
-  Grip,
-  FileCode
-} from 'lucide-react';
-import { showXeenapsToast } from '../../utils/toastUtils';
+  upsertLibraryItemToSupabase, 
+  deleteLibraryItemFromSupabase 
+} from '../../services/LibrarySupabaseService';
 import { showXeenapsDeleteConfirm } from '../../utils/confirmUtils';
-// Fix: Removed non-existent saveLibraryItem and imported Supabase services
-import { deleteLibraryItem, generateCitations, generateInsight, fetchFileContent, translateInsightSection } from '../../services/gasService';
-import { upsertLibraryItemToSupabase, deleteLibraryItemFromSupabase } from '../../services/LibrarySupabaseService';
-import { FormDropdown } from '../Common/FormComponents';
-import Header from '../Layout/Header';
+import { showXeenapsToast } from '../../utils/toastUtils';
+import ContentManagerModal from './ContentManagerModal';
+import ConsultationChatModal from '../Consultation/ConsultationChatModal';
+import SharboxWorkflowModal from '../Sharbox/SharboxWorkflowModal';
 import RelatedPresentations from '../Presenter/RelatedPresentations';
 import RelatedQuestion from '../QuestionBank/RelatedQuestion';
-import ConsultationGallery from '../Consultation/ConsultationGallery';
-import NotebookMain from '../Notebook/NotebookMain';
-import SharboxWorkflowModal from '../Sharbox/SharboxWorkflowModal';
-import TracerProjectPicker from '../Research/Tracer/TracerProjectPicker';
-import TeachingSessionPicker from '../Teaching/TeachingSessionPicker';
-import ContentManagerModal from './ContentManagerModal';
+import { FormDropdown, FormField } from '../Common/FormComponents';
+import { Loader2, Copy } from 'lucide-react';
+// @ts-ignore
+import { useNavigate } from 'react-router-dom';
 
-interface LibraryDetailViewProps {
-  item: LibraryItem;
-  onClose: () => void;
-  isLoading?: boolean;
-  isMobileSidebarOpen?: boolean;
-  onRefresh?: () => Promise<void>;
-  onUpdateOptimistic?: (updatedItem: LibraryItem) => void;
-  onDeleteOptimistic?: (id: string) => void;
-  isLocalOverlay?: boolean;
-}
+// --- SHARED LOCAL COMPONENTS ---
 
-/**
- * Tooltip Component for Premium Hover Effect
- */
-const MiniTooltip: React.FC<{ text: string }> = ({ text }) => (
-  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-[#004A74] text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 translate-y-1 group-hover:translate-y-0 whitespace-nowrap z-[100]">
-    {text}
-    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#004A74]"></div>
-  </div>
-);
-
-/**
- * Citation Modal Component
- */
-const CitationModal: React.FC<{ 
-  item: LibraryItem; 
-  onClose: () => void 
-}> = ({ item, onClose }) => {
+const CitationModal: React.FC<{ item: LibraryItem; onClose: () => void }> = ({ item, onClose }) => {
   const [style, setStyle] = useState('Harvard');
   const [language, setLanguage] = useState('English');
   const [results, setResults] = useState<{ parenthetical: string; narrative: string; bibliography: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-
-  // Editable states
   const [editableParenthetical, setEditableParenthetical] = useState('');
   const [editableNarrative, setEditableNarrative] = useState('');
   const [editableBibliography, setEditableBibliography] = useState('');
@@ -109,12 +69,18 @@ const CitationModal: React.FC<{
 
   const handleGenerate = async () => {
     setIsGenerating(true);
-    const data = await generateCitations(item, style, language);
-    if (data) {
-      setResults(data);
-      setEditableParenthetical(data.parenthetical);
-      setEditableNarrative(data.narrative);
-      setEditableBibliography(data.bibliography);
+    try {
+      const result = await generateCitations(item, style, language);
+      if (result) {
+        setResults(result);
+        setEditableParenthetical(result.parenthetical);
+        setEditableNarrative(result.narrative);
+        setEditableBibliography(result.bibliography);
+      } else {
+        showXeenapsToast('error', 'Citation generation failed');
+      }
+    } catch (e) {
+      showXeenapsToast('error', 'Connection error');
     }
     setIsGenerating(false);
   };
@@ -125,109 +91,28 @@ const CitationModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white/90 backdrop-blur-2xl p-6 md:p-10 rounded-[3rem] w-full max-w-2xl shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] relative border border-white/20 flex flex-col max-h-[85vh] min-h-[450px] md:min-h-[580px]">
-        
-        {/* Modal Header */}
+    <div className="fixed inset-0 z-[2500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white p-8 md:p-10 rounded-[3rem] w-full max-w-2xl shadow-2xl relative border border-white/20 flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#004A74] text-[#FED400] rounded-2xl flex items-center justify-center shadow-lg">
-              <AcademicCapIcon className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-[#004A74] uppercase tracking-tight">Citation Generator</h3>
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Premium Academic Standards</p>
-            </div>
+            <div className="w-12 h-12 bg-[#004A74] text-[#FED400] rounded-2xl flex items-center justify-center shadow-lg"><AcademicCapIcon className="w-7 h-7" /></div>
+            <div><h3 className="text-xl font-black text-[#004A74] uppercase tracking-tight">Citation Architect</h3></div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all"
-          >
-            <XMarkIcon className="w-8 h-8" />
-          </button>
+          <button onClick={onClose} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all"><XMarkIcon className="w-8 h-8" /></button>
         </div>
-
         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-8 pr-2">
-          {/* Configuration Grid using Xeenaps FormDropdown (Search disabled for fixed options) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-1">Citation Style</label>
-              <FormDropdown 
-                value={style} 
-                onChange={(v) => setStyle(v)} 
-                options={styles} 
-                placeholder="Select style..."
-                allowCustom={false}
-                showSearch={false}
-                disabled={isGenerating}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-1">Language</label>
-              <FormDropdown 
-                value={language} 
-                onChange={(v) => setLanguage(v)} 
-                options={languages} 
-                placeholder="Select language..."
-                allowCustom={false}
-                showSearch={false}
-                disabled={isGenerating}
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField label="Style"><FormDropdown value={style} onChange={setStyle} options={styles} placeholder="Select style" allowCustom={false} showSearch={false} /></FormField>
+            <FormField label="Language"><FormDropdown value={language} onChange={setLanguage} options={languages} placeholder="Language" allowCustom={false} showSearch={false} /></FormField>
           </div>
-
-          <button 
-            onClick={handleGenerate} 
-            disabled={isGenerating}
-            className="w-full py-4 bg-[#004A74] text-[#FED400] rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-[#004A74]/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {isGenerating ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <SparklesIcon className="w-5 h-5" />}
-            {isGenerating ? 'Processing...' : 'Cite Now'}
+          <button onClick={handleGenerate} disabled={isGenerating} className="w-full py-4 bg-[#004A74] text-[#FED400] rounded-2xl font-black uppercase text-xs shadow-xl flex items-center justify-center gap-3">
+            {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <SparklesIcon className="w-5 h-5" />} Cite Reference
           </button>
-
-          {/* Results Section */}
           {results && (
             <div className="space-y-6 animate-in slide-in-from-top-4 duration-500 pb-4">
               <div className="h-px bg-gray-100 w-full" />
-              
-              {/* In-Text Parenthetical */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">In-Text (Parenthetical)</span>
-                  <button onClick={() => copyToClipboard(editableParenthetical)} className="text-[#004A74] hover:scale-110 transition-transform"><DocumentDuplicateIcon className="w-4 h-4" /></button>
-                </div>
-                <textarea 
-                  value={editableParenthetical}
-                  onChange={(e) => setEditableParenthetical(e.target.value)}
-                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-semibold text-[#004A74] leading-relaxed focus:bg-white transition-all outline-none resize-none min-h-[60px]"
-                />
-              </div>
-
-              {/* In-Text Narrative */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">In Narrative Citation</span>
-                  <button onClick={() => copyToClipboard(editableNarrative)} className="text-[#004A74] hover:scale-110 transition-transform"><DocumentDuplicateIcon className="w-4 h-4" /></button>
-                </div>
-                <textarea 
-                  value={editableNarrative}
-                  onChange={(e) => setEditableNarrative(e.target.value)}
-                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-semibold text-[#004A74] leading-relaxed focus:bg-white transition-all outline-none resize-none min-h-[60px]"
-                />
-              </div>
-
-              {/* Bibliography */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Bibliographic Citation</span>
-                  <button onClick={() => copyToClipboard(editableBibliography)} className="text-[#004A74] hover:scale-110 transition-transform"><DocumentDuplicateIcon className="w-4 h-4" /></button>
-                </div>
-                <textarea 
-                  value={editableBibliography}
-                  onChange={(e) => setEditableBibliography(e.target.value)}
-                  className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-semibold text-[#004A74] leading-relaxed focus:bg-white transition-all outline-none resize-none min-h-[100px]"
-                />
-              </div>
+              <div className="space-y-2"><div className="flex justify-between px-1"><span className="text-[9px] font-black text-gray-400 uppercase">In-Text</span><button onClick={() => copyToClipboard(editableParenthetical)} className="text-[#004A74] hover:scale-110 transition-transform"><Copy size={14} /></button></div><textarea value={editableParenthetical} onChange={e=>setEditableParenthetical(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-[#004A74] outline-none" rows={2}/></div>
+              <div className="space-y-2"><div className="flex justify-between px-1"><span className="text-[9px] font-black text-gray-400 uppercase">Bibliography</span><button onClick={() => copyToClipboard(editableBibliography)} className="text-[#004A74] hover:scale-110 transition-transform"><Copy size={14} /></button></div><textarea value={editableBibliography} onChange={e=>setEditableBibliography(e.target.value)} className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-[#004A74] outline-none" rows={4}/></div>
             </div>
           )}
         </div>
@@ -236,891 +121,322 @@ const CitationModal: React.FC<{
   );
 };
 
-/**
- * Helper to safely format dates from ISO or raw strings.
- */
-const formatDate = (dateStr: any) => {
-  if (!dateStr || dateStr === 'N/A' || dateStr === 'Unknown') return null;
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) {
-      if (/^\d{4}$/.test(String(dateStr).trim())) return dateStr;
-      return null;
-    }
-    const day = d.getDate().toString().padStart(2, '0');
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    if (String(dateStr).includes('T00:00:00') || String(dateStr).length < 10) return year.toString();
-    return `${day} ${month} ${year}`;
-  } catch (e) {
-    return null;
-  }
-};
-
-/**
- * Helper to format creation/update time in "DD Mmm YYYY hh:mm"
- */
-const formatTimeMeta = (dateStr: string) => {
-  if (!dateStr) return "-";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "-";
-    const day = d.getDate().toString().padStart(2, '0');
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const month = months[d.getMonth()];
-    const year = d.getFullYear();
-    const hours = d.getHours().toString().padStart(2, '0');
-    const minutes = d.getMinutes().toString().padStart(2, '0');
-    return `${day} ${month} ${year} ${hours}:${minutes}`;
-  } catch {
-    return "-";
-  }
-};
-
-/**
- * Helper to parse dynamic JSON fields
- */
-const parseJsonField = (field: any, defaultValue: any = {}) => {
-  if (!field) return defaultValue;
-  if (typeof field === 'object' && !Array.isArray(field)) return field;
-  try {
-    const parsed = typeof field === 'string' ? JSON.parse(field) : field;
-    return parsed || defaultValue;
-  } catch (e) {
-    return defaultValue;
-  }
-};
-
-/**
- * Enhanced List Component with Primary Circle and Yellow Text
- * MODIFIED: Supports Narrative HTML blocks without numeric markers if complex tags are detected.
- */
-const ElegantList: React.FC<{ text?: any; className?: string; isLoading?: boolean }> = ({ text, className = "", isLoading }) => {
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="flex gap-3 items-center">
-            <div className="w-6 h-6 rounded-full skeleton shrink-0" />
-            <div className="h-4 w-full skeleton rounded-lg" />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (text === null || text === undefined || text === 'N/A') return null;
-  
-  // NARRATIVE DETECTION: If text contains specific HTML highlight tags or is very long narrative
-  const isNarrative = typeof text === 'string' && (text.includes('<span') || text.includes('<b') || text.length > 500);
-
-  if (isNarrative) {
-    return (
-      <div 
-        className={`text-sm leading-relaxed text-[#004A74] font-medium ${className}`} 
-        dangerouslySetInnerHTML={{ __html: text }} 
-      />
-    );
-  }
-
-  let items: string[] = [];
-  if (Array.isArray(text)) {
-    items = text.map(i => String(i).trim()).filter(Boolean);
-  } else if (typeof text === 'string') {
-    const trimmedText = text.trim();
-    if (trimmedText === '') return null;
-    items = trimmedText.split(/\n|(?=\d+\.)|(?=•)/)
-      .map(i => i.replace(/^\d+\.\s*|•\s*/, '').trim())
-      .filter(Boolean);
-  } else {
-    const strVal = String(text).trim();
-    if (strVal === '') return null;
-    items = [strVal];
-  }
-
-  if (items.length === 0) return null;
-
-  if (items.length === 1 && typeof text === 'string' && !text.match(/\n|(?=\d+\.)|(?=•)/)) {
-    return (
-      <div className={`text-sm leading-relaxed text-[#004A74] font-medium ${className}`} dangerouslySetInnerHTML={{ __html: text }} />
-    );
-  }
-
+const TipsModal: React.FC<{ tips: string; onClose: () => void }> = ({ tips, onClose }) => {
   return (
-    <ol className={`space-y-3 list-none ${className}`}>
-      {items.map((item, idx) => (
-        <li key={idx} className="flex gap-3 items-start group">
-          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#004A74] text-[#FED400] text-[10px] font-black flex items-center justify-center shadow-sm">
-            {idx + 1}
-          </span>
-          <span className="text-sm text-[#004A74]/90 leading-relaxed font-semibold" dangerouslySetInnerHTML={{ __html: item }} />
-        </li>
-      ))}
-    </ol>
+    <div className="fixed inset-0 z-[2500] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white p-8 rounded-[2.5rem] w-full max-w-lg shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-all"><XMarkIcon className="w-5 h-5" /></button>
+        <div className="flex flex-col items-center text-center space-y-6">
+           <div className="w-16 h-16 bg-[#FED400]/20 text-[#004A74] rounded-2xl flex items-center justify-center shadow-inner">
+              <LightBulbIcon className="w-8 h-8" />
+           </div>
+           <h3 className="text-xl font-black text-[#004A74] uppercase tracking-tight">Quick Tips</h3>
+           <div className="text-sm font-medium text-gray-600 leading-relaxed bg-gray-50 p-6 rounded-2xl border border-gray-100 w-full text-left" dangerouslySetInnerHTML={{ __html: tips || "No tips available." }} />
+        </div>
+      </div>
+    </div>
   );
 };
 
-const LibraryDetailView: React.FC<LibraryDetailViewProps> = ({ item, onClose, isLoading, isMobileSidebarOpen, onRefresh, onUpdateOptimistic, onDeleteOptimistic, isLocalOverlay }) => {
+// --- MAIN COMPONENT ---
+
+interface LibraryDetailViewProps {
+  item: LibraryItem;
+  onClose: () => void;
+  isLoading?: boolean;
+  isMobileSidebarOpen?: boolean;
+  onRefresh?: () => void;
+  onUpdateOptimistic?: (item: LibraryItem) => void;
+  onDeleteOptimistic?: (id: string) => void;
+  isLocalOverlay?: boolean;
+}
+
+const LibraryDetailView: React.FC<LibraryDetailViewProps> = ({ 
+  item, 
+  onClose, 
+  isLoading: initialLoading, 
+  isMobileSidebarOpen, 
+  onRefresh, 
+  onUpdateOptimistic,
+  onDeleteOptimistic,
+  isLocalOverlay
+}) => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showTips, setShowTips] = useState(false);
+  const [currentItem, setCurrentItem] = useState<LibraryItem>(item);
+  const [activeTab, setActiveTab] = useState<'info' | 'insight'>('info');
   const [showCiteModal, setShowCiteModal] = useState(false);
-  const [showPresentations, setShowPresentations] = useState(false); 
-  const [showQuestions, setShowQuestions] = useState(false); 
-  const [showConsultations, setShowConsultations] = useState(false); 
-  const [showNotebook, setShowNotebook] = useState(false); 
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false); 
-  const [isTracerPickerOpen, setIsTracerPickerOpen] = useState(false);
-  const [isTeachingPickerOpen, setIsTeachingPickerOpen] = useState(false);
-  const [isContentManagerOpen, setIsContentManagerOpen] = useState(false);
-  const [dummySearch, setDummySearch] = useState('');
-  
-  const [isBookmarked, setIsBookmarked] = useState(!!item.isBookmarked);
-  const [isFavorite, setIsFavorite] = useState(!!item.isFavorite);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [showTips, setShowTips] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isContentModalOpen, setIsContentModalOpen] = useState(false);
+  const [isConsultModalOpen, setIsConsultModalOpen] = useState(false);
+  const [relatedView, setRelatedView] = useState<'presentation' | 'question' | null>(null);
+
+  // Insight States
+  const [isInsightsLoading, setIsInsightsLoading] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const [isFetchingStoredInsights, setIsFetchingStoredInsights] = useState(false);
-
-  // New state for section-specific translation
-  const [translatingSection, setTranslatingSection] = useState<string | null>(null);
-  const [openTranslationMenu, setOpenTranslationMenu] = useState<string | null>(null);
-
-  const [currentItem, setCurrentItem] = useState(item);
-
-  // MOUNT-TIME STATE MEMORY (FROZEN METADATA)
-  // Menyimpan data navigasi saat komponen pertama kali dipasang untuk mengatasi amnesia state setelah sanitasi.
-  const initialLocationStateRef = useRef(location.state);
-  const wasOpenedViaExternalRef = useRef(!!(location.state as any)?.openItem);
 
   useEffect(() => {
-    const loadJsonInsights = async () => {
-      if (item.insightJsonId) {
-        setIsFetchingStoredInsights(true);
-        const jsonInsights = await fetchFileContent(item.insightJsonId, item.storageNodeUrl);
-        if (jsonInsights && Object.keys(jsonInsights).length > 0) {
-          setCurrentItem(prev => ({
-            ...prev,
-            ...jsonInsights
-          }));
-        }
-        setIsFetchingStoredInsights(false);
-      }
-    };
-    
     setCurrentItem(item);
-    loadJsonInsights();
   }, [item]);
 
-  const pubInfo: PubInfo = useMemo(() => parseJsonField(currentItem.pubInfo), [currentItem.pubInfo]);
-  const identifiers: Identifiers = useMemo(() => parseJsonField(currentItem.identifiers), [currentItem.identifiers]);
-  const tags = useMemo(() => parseJsonField(currentItem.tags, { keywords: [], labels: [] }), [currentItem.tags]);
-  const supportingData: SupportingData = useMemo(() => parseJsonField(currentItem.supportingReferences, { references: [], videoUrl: null }), [currentItem.supportingReferences]);
-  
-  const displayDate = formatDate(currentItem.fullDate || currentItem.year);
-  const authorsText = Array.isArray(currentItem.authors) ? currentItem.authors.join(', ') : (currentItem.authors || 'Unknown');
-
-  const LANG_OPTIONS = [
-    { label: "English", code: "en" },
-    { label: "Indonesian", code: "id" },
-    { label: "Portuguese", code: "pt" },
-    { label: "Spanish", code: "es" },
-    { label: "German", code: "de" },
-    { label: "French", code: "fr" },
-    { label: "Dutch", code: "nl" },
-    { label: "Mandarin", code: "zh" },
-    { label: "Japanese", code: "ja" },
-    { label: "Vietnamese", code: "vi" },
-    { label: "Thai", code: "th" },
-    { label: "Hindi", code: "hi" },
-    { label: "Turkish", code: "tr" },
-    { label: "Russian", code: "ru" },
-    { label: "Arabic", code: "ar" }
-  ];
-
-  const handleOpenLink = (url: string | null) => {
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleCopy = (e: React.MouseEvent, text: string) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    showXeenapsToast('success', 'Reference Copied!');
-  };
-
-  const handleToggleAction = async (property: 'isBookmarked' | 'isFavorite') => {
-    const newValue = property === 'isBookmarked' ? !isBookmarked : !isFavorite;
-    
-    if (property === 'isBookmarked') setIsBookmarked(newValue);
-    else setIsFavorite(newValue);
-    
-    const updatedItem = { ...currentItem, [property]: newValue };
-    
-    if (onUpdateOptimistic) {
-      onUpdateOptimistic(updatedItem);
+  // Load Insights (Sharded JSON) when tab switches to 'insight'
+  useEffect(() => {
+    if (activeTab === 'insight' && currentItem.insightJsonId) {
+      const loadInsights = async () => {
+        setIsInsightsLoading(true);
+        try {
+          const data = await fetchFileContent(currentItem.insightJsonId, currentItem.storageNodeUrl);
+          if (data) {
+             setCurrentItem(prev => ({ ...prev, ...data }));
+          }
+        } catch(e) {
+          console.error("Error loading insights", e);
+        } finally {
+          setIsInsightsLoading(false);
+        }
+      };
+      // Only load if not already populated in memory
+      if (!currentItem.summary && !currentItem.strength) {
+        loadInsights();
+      }
     }
-
-    try {
-      // Fix: Used upsertLibraryItemToSupabase instead of non-existent saveLibraryItem
-      await upsertLibraryItemToSupabase(updatedItem);
-    } catch (e) {
-      if (property === 'isBookmarked') setIsBookmarked(!newValue);
-      else setIsFavorite(!newValue);
-      if (onUpdateOptimistic) onUpdateOptimistic(item);
-      showXeenapsToast('error', 'Failed to sync with server');
-    }
-  };
+  }, [activeTab, currentItem.insightJsonId]);
 
   const handleGenerateInsights = async () => {
-    if (isGeneratingInsights || isFetchingStoredInsights) return;
     setIsGeneratingInsights(true);
-    showXeenapsToast('info', 'AI Insighter is analyzing content...');
-
     try {
-      const data = await generateInsight(currentItem);
-      if (data) {
-        const updated = {
-          ...currentItem,
-          researchMethodology: data.researchMethodology,
-          summary: data.summary,
-          strength: data.strength,
-          weakness: data.weakness,
-          unfamiliarTerminology: data.unfamiliarTerminology,
-          quickTipsForYou: data.quickTipsForYou,
-          updatedAt: new Date().toISOString()
-        };
-        setCurrentItem(updated);
-        showXeenapsToast('success', 'Deep Insights Generated!');
+      const result = await generateInsight(currentItem);
+      if (result) {
+         const updated = { ...currentItem, ...result };
+         setCurrentItem(updated);
+         if (onUpdateOptimistic) onUpdateOptimistic(updated);
+         showXeenapsToast('success', 'Insights Generated');
       } else {
-        showXeenapsToast('error', 'Analysis failed on server');
+         showXeenapsToast('error', 'Generation failed');
       }
     } catch (e) {
-      showXeenapsToast('error', 'Connection error during analysis');
+      showXeenapsToast('error', 'Connection error');
     } finally {
       setIsGeneratingInsights(false);
     }
   };
 
-  const handleTranslateSection = async (sectionName: string, langCode: string) => {
-    if (translatingSection) return;
-    setTranslatingSection(sectionName);
-    setOpenTranslationMenu(null);
-    showXeenapsToast('info', 'Translating content...');
-
-    try {
-      const translated = await translateInsightSection(currentItem, sectionName, langCode);
-      if (translated) {
-        setCurrentItem(prev => ({
-          ...prev,
-          [sectionName]: translated
-        }));
-        showXeenapsToast('success', 'Translation successful!');
-      } else {
-        showXeenapsToast('error', 'Translation service error');
-      }
-    } catch (e) {
-      showXeenapsToast('error', 'Translation failed');
-    } finally {
-      setTranslatingSection(null);
-    }
-  };
-
-  const handleViewCollection = () => {
-    let targetUrl = '';
-    if (currentItem.fileId) {
-      targetUrl = `https://drive.google.com/file/d/${currentItem.fileId}/view`;
-    } else if (currentItem.url) {
-      targetUrl = currentItem.url;
-    }
-    
-    if (targetUrl) {
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
-
-  const handleUpdate = () => {
-    navigate(`/edit/${currentItem.id}`);
-  };
-
   const handleDelete = async () => {
     const confirmed = await showXeenapsDeleteConfirm(1);
     if (confirmed) {
-      if (onDeleteOptimistic) {
-        onDeleteOptimistic(currentItem.id);
-      }
-      onClose();
-      navigate('/');
-      showXeenapsToast('success', 'Processing Deletion...');
-
-      try {
-        // Fix: Call both GAS and Supabase delete services for consistency
-        await deleteLibraryItem(currentItem.id);
-        await deleteLibraryItemFromSupabase(currentItem.id);
-      } catch (e) {
-        showXeenapsToast('error', 'Critical Error: Deletion failed on server');
-        if (onRefresh) onRefresh();
-      }
-    }
-  };
-
-  // SMART DETERMINISTIC BACK LOGIC
-  const handleBack = () => {
-    // 1. Overlay lokal (misal dari Matrix) -> Tutup tanpa history
-    if (isLocalOverlay) {
-      onClose();
-      return;
-    }
-
-    // Menggunakan rujukan state yang dibekukan saat mount (Initial State)
-    const frozenState = initialLocationStateRef.current as any;
-
-    // 2. Modul-specific return logic (Prioritas 1)
-    if (frozenState?.returnToTracerProject) {
-      navigate(`/research/tracer/${frozenState.returnToTracerProject}`, { 
-        state: { reopenReference: frozenState.returnToRef }, 
-        replace: true 
-      });
-      return;
-    } 
-    
-    if (frozenState?.returnToTeaching) {
-      navigate(`/teaching/${frozenState.returnToTeaching}`, { 
-        state: { 
-           activeTab: frozenState.activeTab || 'substance',
-           item: frozenState.teachingItem // Pass back full teaching object for hydration
-        }, 
-        replace: true 
-      });
-      return;
-    } 
-    
-    if (frozenState?.returnToAttachedQuestion) {
-      navigate(`/teaching/${frozenState.returnToAttachedQuestion}/questions`, { 
-        state: { item: frozenState.teachingItem }, 
-        replace: true 
-      });
-      return;
-    } 
-    
-    if (frozenState?.returnToPPT) {
-      navigate('/presentations', { state: { reopenPPT: frozenState.returnToPPT }, replace: true });
-      return;
-    } 
-    
-    if (frozenState?.returnToQuestion) {
-      navigate('/questions', { state: { reopenQuestion: frozenState.returnToQuestion }, replace: true });
-      return;
-    }
-
-    if (frozenState?.returnToAudit) {
-      const audit = frozenState.returnToAudit;
-      if (audit.roughIdea !== undefined) {
-        navigate(`/research/brainstorming/${audit.id}`, { state: { item: audit }, replace: true });
-      } else if (audit.gSlidesId !== undefined || audit.templateName !== undefined) {
-        navigate('/presentations', { state: { reopenPPT: audit }, replace: true });
-      } else if (audit.projectName !== undefined) {
-        navigate(`/research/work/${audit.id}`, { replace: true });
+      if (onDeleteOptimistic) onDeleteOptimistic(currentItem.id);
+      
+      const success = await deleteLibraryItemFromSupabase(currentItem.id);
+      if (!success) {
+         showXeenapsToast('error', 'Failed to delete on server');
+         if (onRefresh) onRefresh(); // Rollback via refresh
       } else {
-        onClose();
+         onClose();
       }
-      return;
     }
-
-    // 3. Generic Referrer
-    if (frozenState?.fromPath) {
-      navigate(frozenState.fromPath, { replace: true, state: frozenState.fromState });
-      return;
-    }
-
-    // 4. Base Logic: Jika URL tidak berubah (Overlay mode), cukup onClose() 
-    // agar tidak melempar user keluar rute secara tidak sengaja (History stack trap).
-    onClose();
   };
 
-  const hasViewLink = !!(currentItem.fileId || currentItem.url);
-  const hasContent = !!currentItem.extractedJsonId;
-  const isAnyLoading = isGeneratingInsights || isFetchingStoredInsights;
+  const handleToggleProp = async (prop: 'isFavorite' | 'isBookmarked') => {
+    const updated = { ...currentItem, [prop]: !currentItem[prop] };
+    setCurrentItem(updated);
+    if (onUpdateOptimistic) onUpdateOptimistic(updated);
+    await upsertLibraryItemToSupabase(updated);
+  };
 
-  // New Subcomponent for Section Header with Translation Button
-  const SectionHeader: React.FC<{ 
-    label: string; 
-    icon: React.ReactNode; 
-    sectionName: string;
-    hasContent: boolean;
-  }> = ({ label, icon, sectionName, hasContent }) => (
-    <div className="flex items-center justify-between mb-2">
-      <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-        {icon} {label}
-      </h3>
-      {hasContent && !isAnyLoading && (
-        <div className="relative group">
-          <button 
-            onClick={() => setOpenTranslationMenu(openTranslationMenu === sectionName ? null : sectionName)}
-            className="p-1.5 text-[#004A74] bg-white border border-gray-100 rounded-lg shadow-sm hover:scale-110 transition-all z-10"
-          >
-            <LanguageIcon className="w-3.5 h-3.5 stroke-[2.5]" />
-          </button>
-          <MiniTooltip text="Translate Section" />
-          {openTranslationMenu === sectionName && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1 z-[110] animate-in fade-in zoom-in-95">
-              <div className="p-2 border-b border-gray-50 mb-1">
-                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Select Language</p>
-              </div>
-              <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                {LANG_OPTIONS.map((lang) => (
-                  <button 
-                    key={lang.code}
-                    onClick={() => handleTranslateSection(sectionName, lang.code)}
-                    className="w-full text-left px-3 py-2 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center justify-between"
-                  >
-                    {lang.label}
-                  </button>
-                ))}
-              </div>
+  const handleEdit = () => {
+    navigate(`/edit/${currentItem.id}`);
+  };
+
+  const renderInsightSection = (title: string, icon: React.ReactNode, content: string | undefined, colorClass: string) => {
+    if (!content && !isGeneratingInsights) return null;
+    return (
+      <div className={`p-6 rounded-[2rem] border ${colorClass} space-y-3`}>
+         <h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 opacity-60">
+            {icon} {title}
+         </h4>
+         {isGeneratingInsights && !content ? (
+            <div className="space-y-2 animate-pulse">
+               <div className="h-2 w-full bg-current opacity-10 rounded" />
+               <div className="h-2 w-3/4 bg-current opacity-10 rounded" />
             </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+         ) : (
+            <div className="text-xs font-medium leading-relaxed opacity-80" dangerouslySetInnerHTML={{ __html: content || '' }} />
+         )}
+      </div>
+    );
+  };
 
-  return (
+  return createPortal(
     <div 
-      className={`fixed top-0 right-0 bottom-0 z-[1000] bg-white flex flex-col will-change-transform overflow-hidden transition-all border-l border-gray-100 ${
-        isMobileSidebarOpen ? 'blur-[15px] opacity-40 pointer-events-none scale-[0.98]' : ''
-      } ${
-        wasOpenedViaExternalRef.current 
-          ? 'animate-in fade-in duration-200' 
-          : 'animate-in fade-in zoom-in-95 slide-in-from-bottom-10 duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]'
-      }`}
-      style={{ 
-        left: 'var(--sidebar-offset, 0px)',
-        transformStyle: 'preserve-3d',
-        backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden'
-      }}
+      className={`fixed top-0 right-0 bottom-0 z-[1200] bg-white flex flex-col will-change-transform overflow-hidden transition-all duration-500 animate-in slide-in-from-right shadow-[-10px_0_30px_-15px_rgba(0,0,0,0.1)] ${isMobileSidebarOpen ? 'blur-[15px] opacity-40 pointer-events-none scale-[0.98]' : ''}`}
+      style={{ left: 'var(--sidebar-offset, 0px)' }}
     >
+      {/* OVERLAYS */}
       {showCiteModal && <CitationModal item={currentItem} onClose={() => setShowCiteModal(false)} />}
-      {isShareModalOpen && (
-        <SharboxWorkflowModal 
-          initialItem={currentItem} 
-          onClose={() => setIsShareModalOpen(false)} 
-        />
-      )}
-      {isTracerPickerOpen && (
-        <TracerProjectPicker 
-          item={currentItem} 
-          onClose={() => setIsTracerPickerOpen(false)} 
-        />
-      )}
-      {isTeachingPickerOpen && (
-        <TeachingSessionPicker 
-          item={currentItem} 
-          onClose={() => setIsTeachingPickerOpen(false)} 
-        />
-      )}
+      {showTips && <TipsModal tips={currentItem.quickTipsForYou || ""} onClose={() => setShowTips(false)} />}
+      {isShareModalOpen && <SharboxWorkflowModal initialItem={currentItem} onClose={() => setIsShareModalOpen(false)} />}
+      {isContentModalOpen && <ContentManagerModal item={currentItem} onClose={() => setIsContentModalOpen(false)} onSuccess={(updated) => { setCurrentItem(updated); if (onUpdateOptimistic) onUpdateOptimistic(updated); }} />}
+      {isConsultModalOpen && <ConsultationChatModal collection={currentItem} onClose={() => setIsConsultModalOpen(false)} />}
       
-      {/* INTEGRATION: Content Manager Modal */}
-      {isContentManagerOpen && (
-        <ContentManagerModal 
-          item={currentItem} 
-          onClose={() => setIsContentManagerOpen(false)} 
-          onSuccess={(updatedItem) => {
-            // Update local state to reflect changes instantly (e.g. enabling Insight button)
-            setCurrentItem(updatedItem);
-            // Notify parent if callback exists
-            if (onUpdateOptimistic) onUpdateOptimistic(updatedItem);
-          }} 
-        />
+      {/* RELATED VIEWS (FULL OVERLAY) */}
+      {relatedView === 'presentation' && (
+         <div className="absolute inset-0 z-[1300] bg-white">
+            <RelatedPresentations collection={currentItem} onBack={() => setRelatedView(null)} />
+         </div>
       )}
-      
-      {/* 1. STICKY TOP AREA: MAINTAIN APP HEADER */}
-      <div className="sticky top-0 z-[90] bg-white/95 backdrop-blur-xl border-b border-gray-100">
-        <div className="px-4 md:px-8">
-           <Header 
-            searchQuery={dummySearch} 
-            setSearchQuery={setDummySearch} 
-            onRefresh={onRefresh}
-           />
-        </div>
+      {relatedView === 'question' && (
+         <div className="absolute inset-0 z-[1300] bg-white">
+            <RelatedQuestion collection={currentItem} onBack={() => setRelatedView(null)} />
+         </div>
+      )}
 
-        {/* 2. DETAIL NAVIGATION BAR */}
-        {(!showPresentations && !showQuestions && !showConsultations && !showNotebook) && (
-          <nav className="px-4 md:px-8 py-3 flex items-center justify-between border-t border-gray-50/50">
-            <button onClick={handleBack} className="flex items-center gap-2 text-[#004A74] font-black uppercase tracking-widest text-[10px] hover:bg-gray-100 px-3 py-2 rounded-xl transition-all">
-              <ArrowLeftIcon className="w-4 h-4 stroke-[3]" /> Back
+      {/* HEADER */}
+      <div className="px-6 md:px-10 py-5 border-b border-gray-100 bg-white/80 backdrop-blur-md flex items-center justify-between shrink-0">
+         <div className="flex items-center gap-4">
+            <button onClick={onClose} className="p-2.5 bg-gray-50 text-gray-400 hover:text-[#004A74] hover:bg-[#FED400]/20 rounded-xl transition-all active:scale-90 shadow-sm">
+               <ArrowLeftIcon className="w-5 h-5" strokeWidth={3} />
             </button>
-
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setShowCiteModal(true)}
-                className="flex items-center gap-2 px-5 py-2 bg-[#FED400] text-[#004A74] text-[10px] font-black uppercase tracking-widest rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all"
-              >
-                Cite
-              </button>
-              
-              {hasViewLink && (
-                <div className="relative group">
-                  <button 
-                    onClick={handleViewCollection}
-                    className="p-2 text-cyan-600 hover:bg-cyan-50 rounded-xl transition-all outline-none"
-                  >
-                    <EyeIcon className="w-5 h-5 stroke-[2.5]" />
-                  </button>
-                  <MiniTooltip text="View Document" />
-                </div>
-              )}
-
-              <div className="relative group">
-                <button 
-                  onClick={() => handleToggleAction('isBookmarked')}
-                  className="p-2 text-[#004A74] hover:bg-[#004A74]/5 rounded-xl transition-all outline-none"
-                >
-                  {isBookmarked ? <BookmarkSolid className="w-5 h-5 text-[#004A74]" /> : <BookmarkIcon className="w-5 h-5 stroke-[2.5]" />}
-                </button>
-                <MiniTooltip text={isBookmarked ? "Unbookmark" : "Bookmark"} />
-              </div>
-
-              <div className="relative group">
-                <button 
-                  onClick={() => handleToggleAction('isFavorite')}
-                  className="p-2 text-[#FED400] hover:bg-[#FED400]/10 rounded-xl transition-all outline-none"
-                >
-                  {isFavorite ? <StarSolid className="w-5 h-5 text-[#FED400]" /> : <StarIcon className="w-5 h-5 stroke-[2.5]" />}
-                </button>
-                <MiniTooltip text={isFavorite ? "Remove from Favorites" : "Add to Favorites"} />
-              </div>
-              
-              <div className="relative">
-                <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-[#004A74] hover:bg-gray-50 rounded-xl transition-all"><EllipsisVerticalIcon className="w-5 h-5 stroke-[2.5]" /></button>
-                {isMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-[2rem] shadow-2xl border border-gray-100 p-2 z-[90] animate-in fade-in zoom-in-95">
-                    <button onClick={handleUpdate} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 hover:bg-[#004A74] hover:text-white rounded-xl transition-all">
-                      <PencilIcon className="w-4 h-4" /> Update
-                    </button>
-                    {/* NEW BUTTON: Manage Content Source Removed from Dropdown */}
-                    
-                    <button 
-                      onClick={() => { if(hasContent) { setShowPresentations(true); setIsMenuOpen(false); } }} 
-                      disabled={!hasContent}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 rounded-xl transition-all ${hasContent ? 'hover:bg-[#004A74] hover:text-white' : 'opacity-50 cursor-not-allowed bg-gray-50'}`}
-                    >
-                      <Presentation className="w-4 h-4" /> Presentation
-                    </button>
-                    <button 
-                      onClick={() => { if(hasContent) { setShowQuestions(true); setIsMenuOpen(false); } }} 
-                      disabled={!hasContent}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 rounded-xl transition-all ${hasContent ? 'hover:bg-[#004A74] hover:text-white' : 'opacity-50 cursor-not-allowed bg-gray-50'}`}
-                    >
-                      <ListTodo className="w-4 h-4" /> Question Bank
-                    </button>
-                    <button 
-                      onClick={() => { if(hasContent) { setShowConsultations(true); setIsMenuOpen(false); } }} 
-                      disabled={!hasContent}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 rounded-xl transition-all ${hasContent ? 'hover:bg-[#004A74] hover:text-white' : 'opacity-50 cursor-not-allowed bg-gray-50'}`}
-                    >
-                      <ChatBubbleLeftRightIcon className="w-4 h-4" /> Consultation
-                    </button>
-                    <button onClick={() => { setShowNotebook(true); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 hover:bg-[#004A74] hover:text-white rounded-xl transition-all">
-                      <NotebookPen className="w-4 h-4" /> Note
-                    </button>
-                    <button 
-                      onClick={() => { if(hasContent) { setIsTracerPickerOpen(true); setIsMenuOpen(false); } }} 
-                      disabled={!hasContent}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 rounded-xl transition-all ${hasContent ? 'hover:bg-[#004A74] hover:text-white' : 'opacity-50 cursor-not-allowed bg-gray-50'}`}
-                    >
-                      <Target className="w-4 h-4" /> Tracer Attachment
-                    </button>
-                    <button onClick={() => { setIsTeachingPickerOpen(true); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 hover:bg-[#004A74] hover:text-white rounded-xl transition-all"><Grip className="w-4 h-4" /> Teaching Attachment</button>
-                    <button onClick={() => { setIsShareModalOpen(true); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-gray-600 hover:bg-[#004A74] hover:text-white rounded-xl transition-all"><ShareIcon className="w-4 h-4" /> Share</button>
-                    <div className="h-px bg-gray-50 my-1 mx-2" />
-                    <button onClick={handleDelete} className="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-red-500 hover:bg-[#004A74] hover:text-white rounded-xl transition-all">
-                      <TrashIcon className="w-4 h-4" /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
+            <div className="min-w-0">
+               <h2 className="text-sm font-black text-[#004A74] uppercase tracking-widest truncate max-w-[200px]">{currentItem.category}</h2>
             </div>
-          </nav>
-        )}
+         </div>
+         
+         <div className="flex bg-gray-100 p-1 rounded-xl">
+            <button onClick={() => setActiveTab('info')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'info' ? 'bg-white text-[#004A74] shadow-sm' : 'text-gray-400'}`}>Info</button>
+            <button onClick={() => setActiveTab('insight')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'insight' ? 'bg-white text-[#004A74] shadow-sm' : 'text-gray-400'}`}>Insights</button>
+         </div>
+
+         <div className="flex items-center gap-2">
+            <button onClick={() => handleToggleProp('isFavorite')} className="p-2 hover:scale-110 transition-transform">
+               {currentItem.isFavorite ? <StarSolid className="w-5 h-5 text-[#FED400]" /> : <StarIcon className="w-5 h-5 text-gray-300" />}
+            </button>
+            <button onClick={() => handleToggleProp('isBookmarked')} className="p-2 hover:scale-110 transition-transform">
+               {currentItem.isBookmarked ? <BookmarkSolid className="w-5 h-5 text-[#004A74]" /> : <BookmarkIcon className="w-5 h-5 text-gray-300" />}
+            </button>
+            <div className="h-6 w-px bg-gray-200 mx-1" />
+            <button onClick={handleDelete} className="p-2 text-gray-300 hover:text-red-500 transition-colors"><TrashIcon className="w-5 h-5" /></button>
+            <button onClick={handleEdit} className="p-2 text-gray-300 hover:text-[#004A74] transition-colors"><PencilIcon className="w-5 h-5" /></button>
+         </div>
       </div>
 
-      {/* 3. CONTENT AREA */}
-      <div className="flex-1 overflow-hidden flex flex-col bg-white">
-        {showPresentations ? (
-          <RelatedPresentations 
-            collection={currentItem} 
-            onBack={() => setShowPresentations(false)} 
-          />
-        ) : showQuestions ? (
-          <RelatedQuestion 
-            collection={currentItem}
-            onBack={() => setShowQuestions(false)}
-          />
-        ) : showConsultations ? (
-          <ConsultationGallery 
-            collection={currentItem}
-            onBack={() => setShowConsultations(false)}
-          />
-        ) : showNotebook ? (
-          <NotebookMain 
-            collectionId={currentItem.id}
-            onBackToLibrary={() => setShowNotebook(false)}
-          />
-        ) : (
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <div className="max-w-6xl mx-auto px-5 md:px-10 py-6 space-y-4">
-              
-              <header className="bg-gray-50/50 p-6 md:p-10 rounded-[2.5rem] border border-gray-100 space-y-4 relative overflow-hidden">
-                {isLoading && !isSyncing ? (
-                  <div className="space-y-4">
-                    <div className="flex gap-2"><div className="h-6 w-20 skeleton rounded-full"/><div className="h-6 w-20 skeleton rounded-full"/></div>
-                    <div className="h-10 w-full skeleton rounded-2xl"/>
-                    <div className="h-4 w-1/2 skeleton rounded-lg"/>
-                    <div className="pt-4 border-t border-gray-100 flex flex-col gap-2">
-                       <div className="h-3 w-1/4 skeleton rounded-md"/>
-                       <div className="h-3 w-1/3 skeleton rounded-md"/>
-                    </div>
+      {/* CONTENT */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 bg-[#fcfcfc]">
+         <div className="max-w-5xl mx-auto space-y-10 pb-32">
+            
+            {/* MAIN IDENTITY CARD */}
+            <div className="bg-white p-8 md:p-10 rounded-[3rem] border border-gray-100 shadow-sm relative overflow-hidden group">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-[#004A74]/5 -translate-y-24 translate-x-24 rounded-full" />
+               <div className="relative z-10 space-y-6">
+                  <div className="flex flex-wrap gap-2">
+                     <span className="px-3 py-1 bg-[#004A74] text-white text-[9px] font-black uppercase tracking-widest rounded-full">{currentItem.topic}</span>
+                     {currentItem.subTopic && <span className="px-3 py-1 bg-[#004A74]/5 text-[#004A74] text-[9px] font-black uppercase tracking-widest rounded-full">{currentItem.subTopic}</span>}
                   </div>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="px-3 py-1 bg-[#004A74] text-white text-[8px] font-black uppercase tracking-widest rounded-full">{currentItem.type}</span>
-                      {currentItem.category && <span className="px-3 py-1 bg-[#004A74]/10 text-[#004A74] text-[8px] font-black uppercase tracking-widest rounded-full">{currentItem.category}</span>}
-                      <span className="px-3 py-1 bg-[#FED400] text-[#004A74] text-[8px] font-black uppercase tracking-widest rounded-full">{currentItem.topic}</span>
-                      {currentItem.subTopic && <span className="px-3 py-1 bg-[#004A74]/5 text-[#004A74] text-[8px] font-black uppercase tracking-widest rounded-full">{currentItem.subTopic}</span>}
-                    </div>
-
-                    <h1 className="text-xl md:text-2xl font-black text-[#004A74] leading-[1.2] break-words uppercase">{currentItem.title}</h1>
-                    
-                    <div className="flex flex-col gap-1">
-                      {displayDate && <p className="text-xs font-black text-gray-400 uppercase tracking-widest">{displayDate}</p>}
-                      <p className="text-sm font-bold text-[#004A74]">{authorsText === 'N/A' ? 'Unknown' : authorsText}</p>
-                    </div>
-
-                    <div className="mt-4 md:mt-0 md:absolute md:bottom-4 md:right-8 transition-all flex flex-col md:flex-row items-start md:items-center gap-4">
-                       {/* Source Button */}
-                       <button 
-                         onClick={() => setIsContentManagerOpen(true)}
-                         className="flex items-center gap-2 px-5 py-2 bg-[#FED400] text-[#004A74] text-[10px] font-black uppercase tracking-widest rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all"
-                       >
-                         SOURCE
-                       </button>
-
-                       {/* Timestamps */}
-                       <div className="flex flex-col items-start md:items-end gap-0.5 opacity-60">
-                          <div className="flex items-center gap-1.5">
-                             <ClockIcon className="w-2.5 h-2.5" />
-                             <span className="text-[7px] font-black uppercase tracking-tighter">Created: {formatTimeMeta(currentItem.createdAt)}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                             <ArrowPathIcon className="w-2.5 h-2.5" />
-                             <span className="text-[7px] font-black uppercase tracking-tighter">Updated: {formatTimeMeta(currentItem.updatedAt)}</span>
-                          </div>
-                       </div>
-                    </div>
-
-                    <div className="space-y-2 pt-4 border-t border-gray-100">
-                      {currentItem.publisher && (
-                        <div className="flex items-start gap-4">
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest w-20 shrink-0 mt-0.5">Publisher</span>
-                          <p className="text-[11px] font-bold text-gray-600">{currentItem.publisher}</p>
-                        </div>
-                      )}
-                      
-                      {(pubInfo.journal || pubInfo.vol || pubInfo.issue || pubInfo.pages) && (
-                        <div className="flex items-start gap-4">
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest w-20 shrink-0 mt-0.5">Publication</span>
-                          <p className="text-[11px] font-bold text-[#004A74]">
-                            {[pubInfo.journal, pubInfo.vol ? `Vol. ${pubInfo.vol}` : '', pubInfo.issue ? `No. ${pubInfo.issue}` : '', pubInfo.pages ? `pp. ${pubInfo.pages}` : ''].filter(Boolean).join(' • ')}
-                          </p>
-                        </div>
-                      )}
-
-                      {Object.values(identifiers).some(v => v) && (
-                        <div className="flex items-start gap-4">
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest w-20 shrink-0 mt-0.5">Identifiers</span>
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                            {identifiers.doi && <p className="text-[9px] font-mono font-bold text-gray-400 italic">DOI: {identifiers.doi}</p>}
-                            {identifiers.issn && <p className="text-[9px] font-mono font-bold text-gray-400 italic">ISSN: {identifiers.issn}</p>}
-                            {identifiers.isbn && <p className="text-[9px] font-mono font-bold text-gray-400 italic">ISBN: {identifiers.isbn}</p>}
-                            {identifiers.pmid && <p className="text-[9px] font-mono font-bold text-gray-400 italic">PMID: {identifiers.pmid}</p>}
-                            {identifiers.arxiv && <p className="text-[9px] font-mono font-bold text-gray-400 italic">arXiv: {identifiers.arxiv}</p>}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </header>
-
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm space-y-3">
-                  <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2"><HashtagIcon className="w-3 h-3" /> Keywords</h3>
-                  {isLoading && !isSyncing ? <div className="h-10 w-full skeleton rounded-xl" /> : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {tags.keywords?.length > 0 ? tags.keywords.map((k: string) => <span key={k} className="px-2.5 py-1 bg-[#004A74]/5 border border-[#004A74]/10 rounded-lg text-[9px] font-bold text-[#004A74]">{k}</span>) : <p className="text-[9px] text-gray-300 italic">No keywords.</p>}
-                    </div>
-                  )}
-                </div>
-                <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-3">
-                  <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2"><TagIcon className="w-3 h-3" /> Labels</h3>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tags.labels?.length > 0 ? tags.labels.map((l: string) => <span key={l} className="px-2.5 py-1 bg-[#FED400]/10 border border-[#FED400]/20 rounded-lg text-[9px] font-bold text-[#004A74]">{l}</span>) : <p className="text-[9px] text-gray-300 italic">No labels.</p>}
+                  <h1 className="text-2xl md:text-4xl font-black text-[#004A74] leading-[1.1] uppercase tracking-tight">{currentItem.title}</h1>
+                  <div className="flex flex-col gap-2 pt-2">
+                     <p className="text-xs font-bold text-gray-500 uppercase italic tracking-wide">{Array.isArray(currentItem.authors) ? currentItem.authors.join(', ') : 'Unknown Authors'}</p>
+                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{currentItem.publisher} • {currentItem.year}</p>
                   </div>
-                </div>
-              </section>
-
-              <section className="bg-white p-6 md:p-10 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4">
-                <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2"><BookOpenIcon className="w-3.5 h-3.5" /> Abstract</h3>
-                {isLoading && !isSyncing ? (
-                   <div className="space-y-2"><div className="h-4 w-full skeleton rounded-md"/><div className="h-4 w-full skeleton rounded-md"/><div className="h-4 w-3/4 skeleton rounded-md"/></div>
-                ) : (
-                  <div className="text-sm leading-relaxed text-[#004A74] font-medium whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: currentItem.abstract || 'No abstract content found.' }} />
-                )}
-              </section>
-
-              {currentItem.extractedJsonId && (
-              <section className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-black text-[#004A74] flex items-center gap-2">
-                    <SparklesIcon className="w-5 h-5 text-[#004A74]" /> INSIGHTS
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={handleGenerateInsights}
-                      disabled={isAnyLoading}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#004A74] text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-[#004A74]/20 hover:scale-105 transition-all disabled:opacity-50"
-                    >
-                      {isGeneratingInsights ? <ArrowPathIcon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
-                      {isGeneratingInsights ? 'Analyzing...' : 'Generate'}
-                    </button>
-                    <button onClick={() => setShowTips(true)} className="p-2 bg-[#FED400] text-[#004A74] rounded-xl shadow-md hover:rotate-12 transition-all">
-                      <LightBulbIcon className="w-4 h-4 stroke-[2.5]" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-3 md:col-span-2">
-                    <SectionHeader 
-                      label="Summary" 
-                      icon={<ClipboardDocumentListIcon className="w-3.5 h-3.5" />} 
-                      sectionName="summary"
-                      hasContent={!!currentItem.summary}
-                    />
-                    {isAnyLoading || translatingSection === 'summary' ? (
-                      <div className="space-y-3">
-                        <div className="h-4 w-full skeleton rounded-md" />
-                        <div className="h-4 w-full skeleton rounded-md" />
-                        <div className="h-4 w-3/4 skeleton rounded-md" />
-                      </div>
-                    ) : (
-                      <div className="text-sm leading-relaxed text-[#004A74] font-medium" dangerouslySetInnerHTML={{ __html: currentItem.summary || 'Summary pending analysis.' }} />
-                    )}
-                  </div>
-
-                  <div className="bg-green-50 p-6 rounded-[2.5rem] border border-green-100/50 shadow-sm space-y-4">
-                    <SectionHeader 
-                      label="Strengths" 
-                      icon={<ClipboardDocumentCheckIcon className="w-3.5 h-3.5" />} 
-                      sectionName="strength"
-                      hasContent={!!currentItem.strength}
-                    />
-                    {translatingSection === 'strength' ? (
-                      <div className="h-20 w-full skeleton rounded-xl" />
-                    ) : (
-                      <ElegantList text={currentItem.strength} isLoading={isAnyLoading} />
-                    )}
-                  </div>
-
-                  <div className="bg-red-50 p-6 rounded-[2.5rem] border border-red-100/50 shadow-sm space-y-4">
-                    <SectionHeader 
-                      label="Weaknesses" 
-                      icon={<ExclamationTriangleIcon className="w-3.5 h-3.5" />} 
-                      sectionName="weakness"
-                      hasContent={!!currentItem.weakness}
-                    />
-                    {translatingSection === 'weakness' ? (
-                      <div className="h-20 w-full skeleton rounded-xl" />
-                    ) : (
-                      <ElegantList text={currentItem.weakness} isLoading={isAnyLoading} />
-                    )}
-                  </div>
-
-                  <div className="bg-[#004A74]/5 p-6 rounded-[2.5rem] border border-[#004A74]/10 shadow-sm space-y-3 md:col-span-2">
-                    <SectionHeader 
-                      label="Unfamiliar Terminology" 
-                      icon={<ChatBubbleBottomCenterTextIcon className="w-3.5 h-3.5" />} 
-                      sectionName="unfamiliarTerminology"
-                      hasContent={!!(currentItem.unfamiliarTerminology || currentItem.quickTipsForYou)}
-                    />
-                    {translatingSection === 'unfamiliarTerminology' ? (
-                      <div className="h-20 w-full skeleton rounded-xl" />
-                    ) : (
-                      <ElegantList text={currentItem.unfamiliarTerminology || currentItem.quickTipsForYou} isLoading={isAnyLoading} />
-                    )}
-                  </div>
-                </div>
-              </section>
-              )}
-
-              <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
-                <div className="space-y-4">
-                  <h3 className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                    <LinkIcon className="w-3.5 h-3.5" /> Supporting References
-                  </h3>
-                  <div className="space-y-3">
-                    {isLoading && !isSyncing ? [...Array(2)].map((_, i) => <div key={i} className="h-20 w-full skeleton rounded-3xl" />) : (
-                      supportingData.references?.length > 0 ? supportingData.references.map((ref: string, idx: number) => {
-                        const urlMatch = ref.match(/https?:\/\/[^\s<]+/);
-                        const url = urlMatch ? urlMatch[0].replace(/[.,;)]+$/, '') : null;
-                        return (
-                          <div key={idx} className="bg-white p-5 rounded-3xl border border-gray-100 flex flex-col gap-3 transition-all hover:bg-[#004A74]/5 group">
-                            <div className="flex gap-3">
-                              <span className="shrink-0 w-6 h-6 rounded-full bg-[#004A74] text-[#FED400] text-[10px] font-black flex items-center justify-center shadow-sm">{idx+1}</span>
-                              <p className="text-[10px] font-bold text-[#004A74]/80 leading-relaxed flex-1" dangerouslySetInnerHTML={{ __html: ref }} />
-                            </div>
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={(e) => handleCopy(e, ref.replace(/<[^>]*>/g, ''))} className="flex items-center gap-2 px-3 py-1.5 bg-white text-[#004A74] rounded-lg border border-gray-100 text-[8px] font-black uppercase tracking-tight shadow-sm hover:bg-[#FED400] transition-all"><DocumentDuplicateIcon className="w-3 h-3" /> Copy</button>
-                              {url && <button onClick={() => handleOpenLink(url)} className="flex items-center gap-2 px-3 py-1.5 bg-[#004A74] text-white rounded-lg text-[8px] font-black uppercase tracking-tight shadow-sm hover:scale-105 transition-all"><ArrowTopRightOnSquareIcon className="w-3 h-3" /> Visit</button>}
-                            </div>
-                          </div>
-                        );
-                      }) : <p className="text-[10px] font-bold text-gray-300 uppercase italic">No supporting references found.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-[#004A74] p-8 rounded-[3rem] text-white space-y-6 flex flex-col">
-                  <h3 className="text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><VideoCameraIcon className="w-4 h-4" /> Visual Insights</h3>
-                  <div className="flex-1 flex flex-col justify-center">
-                    {currentItem.youtubeId || supportingData.videoUrl ? (
-                      <div className="aspect-video rounded-[2rem] overflow-hidden bg-black shadow-2xl border-4 border-white/10">
-                        <iframe className="w-full h-full" src={currentItem.youtubeId || supportingData.videoUrl} frameBorder="0" allowFullScreen></iframe>
-                      </div>
-                    ) : (
-                      <div className="aspect-video rounded-[2rem] bg-white/5 border-2 border-dashed border-white/10 flex flex-col items-center justify-center space-y-4">
-                        <VideoCameraIcon className="w-12 h-12 text-white/10" />
-                        <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">Video node unavailable</p>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-[#FED400]/80 font-bold italic text-center px-4">"Multimedia triangulation anchors knowledge 40% faster than text alone."</p>
-                </div>
-              </section>
+               </div>
             </div>
-          </div>
-        )}
+
+            {/* TAB CONTENT */}
+            {activeTab === 'info' && (
+               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+                     <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400 mb-6 flex items-center gap-2"><BookOpenIcon className="w-4 h-4" /> Abstract</h3>
+                     <div className="text-sm font-medium text-[#004A74] leading-relaxed whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: currentItem.abstract || 'No abstract available.' }} />
+                  </div>
+
+                  {/* IDENTIFIERS GRID */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                     {[
+                        { l: 'DOI', v: currentItem.identifiers?.doi },
+                        { l: 'ISSN', v: currentItem.identifiers?.issn },
+                        { l: 'ISBN', v: currentItem.identifiers?.isbn },
+                        { l: 'PMID', v: currentItem.identifiers?.pmid }
+                     ].map(id => id.v && (
+                        <div key={id.l} className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                           <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">{id.l}</span>
+                           <span className="block text-[10px] font-bold text-[#004A74] font-mono truncate">{id.v}</span>
+                        </div>
+                     ))}
+                  </div>
+
+                  {/* ACTIONS GRID */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                     <button onClick={() => window.open(currentItem.url, '_blank')} className="p-5 bg-white border border-gray-100 rounded-[2rem] hover:shadow-lg transition-all flex flex-col items-center justify-center gap-3 group">
+                        <LinkIcon className="w-8 h-8 text-gray-300 group-hover:text-[#004A74]" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Source Link</span>
+                     </button>
+                     <button onClick={() => setIsContentModalOpen(true)} className="p-5 bg-white border border-gray-100 rounded-[2rem] hover:shadow-lg transition-all flex flex-col items-center justify-center gap-3 group">
+                        <DocumentTextIcon className="w-8 h-8 text-gray-300 group-hover:text-[#004A74]" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">{currentItem.extractedJsonId ? 'Manage Content' : 'Add Content'}</span>
+                     </button>
+                     <button onClick={() => setShowCiteModal(true)} className="p-5 bg-white border border-gray-100 rounded-[2rem] hover:shadow-lg transition-all flex flex-col items-center justify-center gap-3 group">
+                        <CheckBadgeIcon className="w-8 h-8 text-gray-300 group-hover:text-[#004A74]" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Cite This</span>
+                     </button>
+                     <button onClick={() => setIsShareModalOpen(true)} className="p-5 bg-white border border-gray-100 rounded-[2rem] hover:shadow-lg transition-all flex flex-col items-center justify-center gap-3 group">
+                        <ShareIcon className="w-8 h-8 text-gray-300 group-hover:text-[#004A74]" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Share</span>
+                     </button>
+                  </div>
+               </div>
+            )}
+
+            {activeTab === 'insight' && (
+               <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+                     <button onClick={() => setIsConsultModalOpen(true)} className="flex items-center gap-2 px-6 py-3 bg-[#004A74] text-[#FED400] rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all whitespace-nowrap">
+                        <ChatBubbleLeftRightIcon className="w-4 h-4" /> AI Consultation
+                     </button>
+                     <button onClick={handleGenerateInsights} disabled={isGeneratingInsights} className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 text-[#004A74] rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-gray-50 transition-all whitespace-nowrap">
+                        {isGeneratingInsights ? <Loader2 className="w-4 h-4 animate-spin" /> : <SparklesIcon className="w-4 h-4" />} Regenerate Analysis
+                     </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="md:col-span-2">
+                        {renderInsightSection("Executive Summary", <ClipboardDocumentListIcon className="w-4 h-4" />, currentItem.summary, "bg-white border-gray-100 text-[#004A74]")}
+                     </div>
+                     {renderInsightSection("Key Strengths", <ClipboardDocumentCheckIcon className="w-4 h-4" />, currentItem.strength, "bg-green-50 border-green-100 text-green-800")}
+                     {renderInsightSection("Limitations", <ExclamationTriangleIcon className="w-4 h-4" />, currentItem.weakness, "bg-red-50 border-red-100 text-red-800")}
+                     <div className="md:col-span-2">
+                        {renderInsightSection("Terminology & Concepts", <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />, currentItem.unfamiliarTerminology, "bg-[#004A74]/5 border-[#004A74]/10 text-[#004A74]")}
+                     </div>
+                     <div className="md:col-span-2">
+                         {currentItem.quickTipsForYou && (
+                           <div onClick={() => setShowTips(true)} className="p-6 rounded-[2rem] bg-[#FED400] text-[#004A74] cursor-pointer hover:scale-[1.01] transition-all shadow-xl">
+                              <h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-2"><LightBulbIcon className="w-4 h-4" /> Quick Tips</h4>
+                              <p className="text-xs font-bold line-clamp-2">Click to view actionable tips extracted from this document.</p>
+                           </div>
+                         )}
+                     </div>
+                  </div>
+
+                  {/* CROSS-MODULE ACTIONS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-8 border-t border-gray-100">
+                     <button onClick={() => setRelatedView('presentation')} className="p-8 bg-white border border-gray-100 rounded-[2.5rem] text-left hover:shadow-xl hover:border-[#004A74]/30 transition-all group">
+                        <div className="w-12 h-12 bg-[#004A74]/5 text-[#004A74] rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#004A74] group-hover:text-white transition-colors">
+                           <PresentationChartBarIcon className="w-6 h-6" />
+                        </div>
+                        <h4 className="text-sm font-black text-[#004A74] uppercase tracking-tight">Presentation Deck</h4>
+                        <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">Create slides from this source</p>
+                     </button>
+                     <button onClick={() => setRelatedView('question')} className="p-8 bg-white border border-gray-100 rounded-[2.5rem] text-left hover:shadow-xl hover:border-[#004A74]/30 transition-all group">
+                        <div className="w-12 h-12 bg-[#004A74]/5 text-[#004A74] rounded-2xl flex items-center justify-center mb-4 group-hover:bg-[#004A74] group-hover:text-white transition-colors">
+                           <AcademicCapIcon className="w-6 h-6" />
+                        </div>
+                        <h4 className="text-sm font-black text-[#004A74] uppercase tracking-tight">Question Bank</h4>
+                        <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">Generate quiz items</p>
+                     </button>
+                  </div>
+               </div>
+            )}
+         </div>
       </div>
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 74, 116, 0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 74, 116, 0.2); }
-      `}</style>
-    </div>
+    </div>,
+    document.body
   );
 };
 
