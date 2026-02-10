@@ -394,7 +394,8 @@ export interface TeachingItem {
   assessmentCriteria: string;
 
   // System
-  vaultJsonId: string;
+  vaultJsonId: string; // Deprecated
+  vault_items?: TeachingVaultItem[]; // New Direct Registry
   storageNodeUrl: string;
   status: SessionStatus;
   createdAt: string;

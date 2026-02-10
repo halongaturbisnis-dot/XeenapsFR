@@ -79,12 +79,14 @@ export const upsertTeachingToSupabase = async (item: TeachingItem): Promise<bool
   const { search_all, ...cleanItem } = item as any;
 
   // Pastikan JSON fields berupa array/object valid, bukan undefined
+  // Dan sertakan vault_items
   const payload = {
     ...cleanItem,
     referenceLinks: Array.isArray(cleanItem.referenceLinks) ? cleanItem.referenceLinks : [],
     presentationId: Array.isArray(cleanItem.presentationId) ? cleanItem.presentationId : [],
     questionBankId: Array.isArray(cleanItem.questionBankId) ? cleanItem.questionBankId : [],
     attachmentLink: Array.isArray(cleanItem.attachmentLink) ? cleanItem.attachmentLink : [],
+    vault_items: Array.isArray(cleanItem.vault_items) ? cleanItem.vault_items : [],
     updatedAt: new Date().toISOString()
   };
 

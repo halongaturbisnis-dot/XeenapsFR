@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS public.teaching_logs (
     "status" TEXT DEFAULT 'Planned',
     "createdAt" TIMESTAMPTZ DEFAULT now(),
     "updatedAt" TIMESTAMPTZ DEFAULT now(),
-    "search_all" TEXT -- Index pencarian
+    "search_all" TEXT, -- Index pencarian
+    "vault_items" JSONB DEFAULT '[]'::jsonb -- Direct Registry untuk dokumentasi
 );
 
 -- Indexing
