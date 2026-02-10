@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowPathIcon, BellIcon, InboxIcon, CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { Target } from 'lucide-react';
@@ -108,6 +109,8 @@ const Header: React.FC<HeaderProps> = ({ searchQuery, setSearchQuery, onRefresh 
   }, []);
 
   const handleRefreshClick = () => {
+    // FORCE RESET: Clear global cache to ensure fresh fetch on reload
+    profileCache = { name: "", photo: "", isLoaded: false };
     window.location.reload();
   };
 

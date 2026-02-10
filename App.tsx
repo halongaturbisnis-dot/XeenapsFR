@@ -66,6 +66,14 @@ const App: React.FC = () => {
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
+    // VISUAL FEEDBACK: Wipe data to ensure fresh UI state (No stale data ghosting)
+    setItems([]);
+    setTeachingItems([]);
+    setActivityItems([]);
+    setTracerProjects([]);
+    setPublicationItems([]);
+    setBrainstormingItems([]);
+
     try {
       // Parallel fetch for all main data sets to minimize initial loading time
       const [libData, tRes, aRes, trRes, pRes, bRes] = await Promise.all([

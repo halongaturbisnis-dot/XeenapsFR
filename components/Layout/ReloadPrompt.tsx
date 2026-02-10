@@ -16,6 +16,8 @@ const ReloadPrompt: React.FC = () => {
   } = useRegisterSW({
     onRegistered(r: any) {
       if (r) {
+        // FORCE CHECK: Immediately check for update on load/refresh
+        r.update();
         // Check for updates every hour to keep long-running tabs fresh
         setInterval(() => {
           r.update();
