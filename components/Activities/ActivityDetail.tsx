@@ -100,6 +100,7 @@ const ActivityDetail: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [optimisticCertPreview, setOptimisticCertPreview] = useState<string | null>(null);
+  const [isCertImage, setIsCertImage] = useState(true); // State to track certificate type
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // State Management for Manual Save
@@ -112,14 +113,19 @@ const ActivityDetail: React.FC = () => {
       const stateItem = (location.state as any)?.item;
       if (stateItem && stateItem.id === id) {
         setItem(stateItem);
+        setIsCertImage(true); // Reset to default assumption
         setIsLoading(false);
         return;
       }
 
       const res = await fetchActivitiesPaginated(1, 1000);
       const found = res.items.find(i => i.id === id);
-      if (found) setItem(found);
-      else navigate('/activities');
+      if (found) {
+        setItem(found);
+        setIsCertImage(true); // Reset to default assumption
+      } else {
+        navigate('/activities');
+      }
       setIsLoading(false);
     };
     load();
@@ -190,13 +196,19 @@ const ActivityDetail: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !item) return;
 
+    // Determine type for correct handling
+    const isImage = file.type.startsWith('image/');
+    setIsCertImage(isImage);
+
     // 1. OPTIMISTIC INSTANT PREVIEW
-    if (file.type.startsWith('image/')) {
+    if (isImage) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         setOptimisticCertPreview(ev.target?.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+      setOptimisticCertPreview(null);
     }
 
     setIsUploading(true);
@@ -362,7 +374,13 @@ const ActivityDetail: React.FC = () => {
   }
 
   const hasCertificate = !!(item.certificateFileId || optimisticCertPreview);
-  const certificateUrl = optimisticCertPreview || (item.certificateFileId ? `https://lh3.googleusercontent.com/d/${item.certificateFileId}` : null);
+  
+  // LOGIC URL: LH3 for Images, Drive for Files/PDFs
+  const certificateUrl = optimisticCertPreview || (item.certificateFileId ? 
+    (isCertImage 
+      ? `https://lh3.googleusercontent.com/d/${item.certificateFileId}` 
+      : `https://drive.google.com/file/d/${item.certificateFileId}/view`
+    ) : null);
   
   // Guard for header back button visual state
   const isLocked = isUploading || isSaving;
@@ -416,7 +434,7 @@ const ActivityDetail: React.FC = () => {
                   onClick={() => navigate(`/activities/${item.id}/vault`, { state: { item } })}
                   disabled={isLocked}
                   className="p-2.5 bg-white border border-gray-100 text-[#004A74] hover:bg-blue-50 rounded-xl transition-all shadow-sm active:scale-90"
-                  title="Documentation Gallery"
+                  title="Documentation Vault"
                 >
                   <FolderOpen size={18} />
                 </button>
@@ -524,14 +542,25 @@ const ActivityDetail: React.FC = () => {
                      </div>
                    </>
                 ) : hasCertificate ? (
-                  <div className="relative w-full h-full">
-                     {/* INSTANT SHARP PREVIEW */}
-                     <img 
-                       src={certificateUrl!} 
-                       className="w-full h-full object-cover" 
-                       alt="Certificate"
-                       onClick={(e) => { e.stopPropagation(); window.open(certificateUrl!, '_blank'); }}
-                     />
+                  <div className="relative w-full h-full bg-gray-50 flex items-center justify-center">
+                     {isCertImage ? (
+                        <img 
+                          src={certificateUrl!} 
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+                          alt="Certificate"
+                          onError={() => setIsCertImage(false)}
+                          onClick={(e) => { e.stopPropagation(); window.open(certificateUrl!, '_blank'); }}
+                        />
+                     ) : (
+                        <div 
+                           className="flex flex-col items-center justify-center text-[#004A74] cursor-pointer w-full h-full"
+                           onClick={(e) => { e.stopPropagation(); window.open(certificateUrl!, '_blank'); }}
+                        >
+                           <FileCheck size={64} strokeWidth={1} />
+                           <span className="text-[10px] font-black uppercase tracking-widest mt-2">DOCUMENT FILE</span>
+                           <span className="text-[8px] font-bold text-gray-400 mt-1">Click to View</span>
+                        </div>
+                     )}
                      
                      {/* HOVER OVERLAY: THIN WHITE BLUR */}
                      <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-[2px] pointer-events-none" />
@@ -557,7 +586,7 @@ const ActivityDetail: React.FC = () => {
                      </div>
 
                      {/* CLICK TO VIEW ICON OVERLAY */}
-                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none transition-all">
+                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-0">
                         <div className="bg-black/60 p-4 rounded-full text-white shadow-2xl">
                            <Eye size={32} />
                         </div>
