@@ -21,17 +21,17 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: 'https://lh3.googleusercontent.com/d/1ZpVAXWGLDP2C42Fct0bisloaQLf2095_',
+            src: 'https://lh3.googleusercontent.com/d/1ZXa5ltVQo_7mnxhA4Iy9e7JMf_IVr1Bx',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'https://lh3.googleusercontent.com/d/1ZpVAXWGLDP2C42Fct0bisloaQLf2095_',
+            src: 'https://lh3.googleusercontent.com/d/1ZXa5ltVQo_7mnxhA4Iy9e7JMf_IVr1Bx',
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'https://lh3.googleusercontent.com/d/1ZpVAXWGLDP2C42Fct0bisloaQLf2095_',
+            src: 'https://lh3.googleusercontent.com/d/1ZXa5ltVQo_7mnxhA4Iy9e7JMf_IVr1Bx',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'

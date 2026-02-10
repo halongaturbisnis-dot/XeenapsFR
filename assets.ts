@@ -1,6 +1,7 @@
 
 export const BRAND_ASSETS = {
   LOGO_ICON: "https://lh3.googleusercontent.com/d/1ZpVAXWGLDP2C42Fct0bisloaQLf2095_",
+  LOGO_ICON_BG: "https://lh3.googleusercontent.com/d/1ZXa5ltVQo_7mnxhA4Iy9e7JMf_IVr1Bx",
   LOGO_FULL: "https://lh3.googleusercontent.com/d/1nXs_iY9Wxxsmsh2abHiu1h549c9WlEpy",
   MAINDI_LOGO: "https://lh3.googleusercontent.com/d/1lnriXWQkwjA57LZq8A02WZOnTVosVisV",
   YOUTUBE_ICON: "https://lh3.googleusercontent.com/d/1NRBIG27DW1BGY6mGFvIF4HMXeKNiVaSR",
