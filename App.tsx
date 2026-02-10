@@ -27,6 +27,7 @@ import NotebookMain from './components/Notebook/NotebookMain';
 import AllReview from './components/Research/LiteratureReview/AllReview';
 import ReviewDetail from './components/Research/LiteratureReview/ReviewDetail';
 import DashboardMain from './components/Dashboard/DashboardMain';
+import ReloadPrompt from './components/Layout/ReloadPrompt';
 
 // Placeholder for the upcoming modules
 const ActivityMain = React.lazy(() => import('./components/Activities/ActivityMain'));
@@ -253,6 +254,8 @@ const App: React.FC = () => {
   return (
     <Router>
       <ScrollToTop />
+      {/* Silent Updater for PWA Lifecycle */}
+      <ReloadPrompt />
       <div className={`flex min-h-screen bg-white text-[#004A74] ${isLoading ? 'pointer-events-none select-none' : ''}`}>
         {isMobileSidebarOpen && (
           <div 
