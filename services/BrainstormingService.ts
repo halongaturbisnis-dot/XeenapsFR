@@ -40,6 +40,29 @@ export const deleteBrainstorming = async (id: string): Promise<boolean> => {
 
 // --- AI FUNCTIONS (REMAIN ON GAS/AI PROXY) ---
 
+export const translateSingleField = async (
+  text: string, 
+  targetLang: string
+): Promise<string | null> => {
+  if (!text) return null;
+  const prompt = `TRANSLATE THE FOLLOWING TEXT TO ${targetLang}.
+  REQUIREMENTS:
+  1. Maintain academic tone and nuance.
+  2. Preserve any HTML tags if present (e.g. <b>, <i>).
+  3. RETURN ONLY THE TRANSLATED TEXT. NO CONVERSATIONAL FILLER.
+  
+  TEXT:
+  "${text}"`;
+
+  try {
+    const response = await callAiProxy('gemini', prompt);
+    return response ? response.trim() : null;
+  } catch (e) {
+    console.error("Translation failed:", e);
+    return null;
+  }
+};
+
 export const refineBrainstormingField = async (
   fieldName: string,
   currentValue: string,

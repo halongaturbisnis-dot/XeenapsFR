@@ -1,10 +1,11 @@
 
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 // @ts-ignore - Resolving TS error for missing exported members
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 // Fix: Added missing ResearchSource type import
-import { TracerProject, TracerLog, TracerLogContent, LibraryItem, TracerStatus, TracerReference, TracerTodo, ResearchSource } from '../../../types';
+import { TracerProject, TracerLog, TracerReference, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse, TracerLogContent, TracerReferenceContent, LibraryItem, TracerStatus, ResearchSource } from '../../../types';
 import { 
   fetchTracerProjects, 
   saveTracerProject, 
@@ -39,7 +40,8 @@ import {
   Bold,
   Italic,
   Save,
-  Loader2
+  Loader2,
+  Search
 } from 'lucide-react';
 // Fix: Added missing component imports for the modals used at the end of the file
 import ResearchSourceSelectorModal from '../ResearchSourceSelectorModal';
@@ -54,6 +56,7 @@ import TracerLogModal from './Modals/TracerLogModal';
 import { GlobalSavingOverlay } from '../../Common/LoadingComponents';
 import Swal from 'sweetalert2';
 import { XEENAPS_SWAL_CONFIG } from '../../../utils/swalUtils';
+import TracerField from './TracerField';
 
 // --- SAVE MEMORY CACHE ---
 const logContentCache: Record<string, TracerLogContent> = {};
@@ -80,45 +83,6 @@ const TracerDetailSkeleton: React.FC = () => (
   </div>
 );
 
-/**
- * Rich Text Editor for Novelty Output
- */
-const NoveltyEditor: React.FC<{ 
-  value: string; 
-  onChange: (val: string) => void; 
-  disabled?: boolean 
-}> = ({ value, onChange, disabled }) => {
-  const editorRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value;
-    }
-  }, [value]);
-
-  const execCommand = (command: string) => {
-    document.execCommand(command, false);
-    if (editorRef.current) onChange(editorRef.current.innerHTML);
-  };
-
-  return (
-    <div className={`flex flex-col rounded-[2.5rem] border border-gray-200 overflow-hidden bg-white shadow-sm focus-within:ring-2 focus-within:ring-[#004A74]/10 transition-all ${disabled ? 'opacity-60 grayscale cursor-not-allowed' : ''}`}>
-      <div className="flex items-center gap-1 p-3 bg-gray-50 border-b border-gray-100">
-        {/* Fix: Used newly imported Bold and Italic icons */}
-        <button type="button" onClick={() => execCommand('bold')} disabled={disabled} className={`p-2 hover:bg-white rounded-xl transition-all text-[#004A74]`}><Bold size={16} /></button>
-        <button type="button" onClick={() => execCommand('italic')} disabled={disabled} className={`p-2 hover:bg-white rounded-xl transition-all text-[#004A74]`}><Italic size={16} /></button>
-      </div>
-      <div
-        ref={editorRef}
-        contentEditable={!disabled}
-        onInput={(e) => onChange(e.currentTarget.innerHTML)}
-        className="p-8 text-sm min-h-[400px] outline-none leading-relaxed text-[#004A74] font-medium"
-        {...({ "data-placeholder": "Awaiting novelty analysis..." } as any)}
-      />
-    </div>
-  );
-};
-
 const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -128,15 +92,10 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
   const [logs, setLogs] = useState<TracerLog[]>([]);
   const [todos, setTodos] = useState<TracerTodo[]>([]);
   const [references, setReferences] = useState<TracerReference[]>([]);
-  // Fix: Added missing state variables to resolve "Cannot find name" errors
   const [sources, setSources] = useState<ResearchSource[]>([]);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   
-  // STATE MANAGEMENT FOR OVERLAYS
   const [selectedSourceForDetail, setSelectedSourceForDetail] = useState<LibraryItem | null>(null);
-  
-  // NAVIGATION MEMORY (Return Ticket)
-  // Holds the Reference Item to re-open after LibraryDetail is closed
   const [returnToReferenceItem, setReturnToReferenceItem] = useState<any>(null);
 
   const [activeTab, setActiveTab] = useState<'identity' | 'todo' | 'log' | 'refs' | 'finance'>(
@@ -146,17 +105,13 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
   const [isBusy, setIsBusy] = useState(false);
   const [cleanedProfileName, setCleanedProfileName] = useState("Xeenaps User");
 
-  // MANUAL SAVE STATE
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // RE-OPEN STATE (Passed to Reference Tab)
   const [initialReopenRef, setInitialReopenRef] = useState<any>(null);
   
-  // LOG MODAL STATE
   const [logModal, setLogModal] = useState<{ open: boolean; log?: TracerLog; cachedContent?: TracerLogContent }>({ open: false });
 
-  // --- SYNC ENGINE REFS ---
   const projectRef = useRef<TracerProject | null>(null);
 
   const loadAllData = useCallback(async (showSkeleton = false) => {
@@ -165,12 +120,11 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     
     try {
       const [resProjects, resLogs, resTodos, resRefs, cleanedName, resSources] = await Promise.all([
-        fetchTracerProjects(1, 1000), // Updated service call returns { items, totalCount }
+        fetchTracerProjects(1, 1000), 
         fetchTracerLogs(id),
         fetchTracerTodos(id),
         fetchTracerReferences(id),
         getCleanedProfileName(),
-        // Fix: Fetch sources to hydrate the local state
         fetchProjectSources(id)
       ]);
       
@@ -184,11 +138,10 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
           authors: Array.isArray(found.authors) ? found.authors : [cleanedName]
         };
         setProject(hydrated);
-        projectRef.current = hydrated; // Initial sync
+        projectRef.current = hydrated;
         setLogs(resLogs);
         setTodos(resTodos);
         setReferences(resRefs);
-        // Fix: Set sources state
         setSources(resSources);
 
         const state = location.state as any;
@@ -213,10 +166,8 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     loadAllData(true);
   }, [loadAllData]);
 
-  // NAVIGATION GUARD FOR DIRTY STATE
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Only protect if active tab is Identity AND isDirty
       if (activeTab === 'identity' && isDirty) {
         e.preventDefault();
         e.returnValue = '';
@@ -226,9 +177,7 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty, activeTab]);
 
-  // Global Sidebar Guard
   useEffect(() => {
-    // Only lock sidebar if active tab is Identity AND isDirty
     (window as any).xeenapsIsDirty = (activeTab === 'identity' && isDirty);
     return () => { (window as any).xeenapsIsDirty = false; };
   }, [isDirty, activeTab]);
@@ -247,7 +196,7 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
       const success = await saveTracerProject(project);
       if (success) {
         setIsDirty(false);
-        projectRef.current = project; // Sync reference on save
+        projectRef.current = project; 
         showXeenapsToast('success', 'Changes saved successfully');
       } else {
         showXeenapsToast('error', 'Failed to save changes');
@@ -259,7 +208,6 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     }
   };
 
-  // REVERT CHANGES HELPER
   const handleDiscard = () => {
     if (projectRef.current) {
       setProject(projectRef.current);
@@ -267,7 +215,6 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     setIsDirty(false);
   };
 
-  // SAFE BACK NAVIGATION
   const handleSafeBack = async () => {
     if (activeTab === 'identity' && isDirty) {
       const result = await Swal.fire({
@@ -289,10 +236,8 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     }
   };
 
-  // SAFE TAB SWITCHING
   const handleTabChange = async (newTab: typeof activeTab) => {
     if (activeTab === newTab) return;
-    
     if (activeTab === 'identity' && isDirty) {
       const result = await Swal.fire({
         ...XEENAPS_SWAL_CONFIG,
@@ -303,7 +248,6 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
         cancelButtonText: 'Cancel',
         confirmButtonColor: '#ef4444'
       });
-
       if (result.isConfirmed) {
         handleDiscard();
         setActiveTab(newTab);
@@ -358,7 +302,6 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     }
   };
 
-  // Fix: Added missing handleStartAudit function to handle selection results from the modal
   const handleStartAudit = async (selectedLibs: LibraryItem[]) => {
     if (!project) return;
     setIsSelectorOpen(false);
@@ -412,8 +355,6 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     showXeenapsToast('success', 'Matrix segments updated.');
   };
 
-  // UPDATED: Handle opening Library Detail. 
-  // Optionally receives 'referenceItem' to be saved as the return ticket.
   const handleOpenLibraryFromRef = (lib: LibraryItem, referenceContext?: any) => {
     setSelectedSourceForDetail(lib);
     if (referenceContext) {
@@ -421,18 +362,14 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
     }
   };
   
-  // UPDATED: Handle Closing Library Detail
-  // Checks if there's a return ticket to re-open the reference modal.
   const handleCloseLibraryDetail = () => {
     setSelectedSourceForDetail(null);
     if (returnToReferenceItem) {
       setInitialReopenRef(returnToReferenceItem);
-      setReturnToReferenceItem(null); // Clear the ticket
+      setReturnToReferenceItem(null); 
     }
   };
 
-  // NEW: Handler to clear reopen state. Passed down to ReferenceTab.
-  // This ensures that when ReferenceDetailView is closed by the user, it doesn't reopen on tab switch.
   const handleClearReopenRef = () => {
     setInitialReopenRef(null);
   };
@@ -442,11 +379,7 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
       const d = new Date(dateStr);
       const day = d.getDate().toString().padStart(2, '0');
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      const month = months[d.getMonth()];
-      const year = d.getFullYear();
-      const hours = d.getHours().toString().padStart(2, '0');
-      const minutes = d.getMinutes().toString().padStart(2, '0');
-      return `${day} ${month} ${year} ${hours}:${minutes}`;
+      return `${day} ${months[d.getMonth()]} ${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
     } catch { return "-"; }
   };
 
@@ -463,23 +396,15 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
 
   return (
     <FormPageContainer>
-      {/* GLOBAL SAVING OVERLAY */}
       <GlobalSavingOverlay isVisible={isSaving} />
 
       <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md px-4 md:px-10 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
-          <button onClick={handleSafeBack} className="p-2.5 bg-gray-50 text-gray-400 hover:text-[#004A74] rounded-xl transition-all shadow-sm active:scale-90"><ArrowLeft size={18} /></button>
+          <button onClick={handleSafeBack} className="p-2.5 bg-gray-50 text-gray-400 hover:text-[#004A74] hover:bg-[#FED400]/20 rounded-xl transition-all shadow-sm active:scale-90"><ArrowLeft size={18} /></button>
           <div className="min-w-0 hidden lg:block">
-            {/* UPDATED HEADER: STATIC TEXT */}
             <h2 className="text-sm font-black text-[#004A74] truncate">RESEARCH TRACER</h2>
-            {/* REMOVED PROJECT ID PARAGRAPH */}
           </div>
-          <button 
-            onClick={handlePermanentDeleteProject}
-            disabled={isBusy}
-            className="p-2.5 bg-white text-red-300 hover:text-red-500 hover:bg-red-50 border border-gray-100 rounded-xl transition-all shadow-sm active:scale-90 disabled:opacity-30"
-            title="Delete Project Permanently"
-          >
+          <button onClick={handlePermanentDeleteProject} disabled={isBusy} className="p-2.5 bg-white text-red-300 hover:text-red-500 hover:bg-red-50 border border-gray-100 rounded-xl transition-all shadow-sm active:scale-90 disabled:opacity-30">
             <Trash2 size={18} />
           </button>
         </div>
@@ -491,16 +416,10 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
           ))}
         </div>
         
-        {/* MANUAL SAVE BUTTON - Only visible when dirty & active tab is Identity */}
         <div className="flex items-center justify-end w-[120px]">
            {activeTab === 'identity' && isDirty && (
-              <button 
-                onClick={handleManualSave}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 bg-[#004A74] text-[#FED400] rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all animate-in fade-in zoom-in-95"
-              >
-                {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save size={14} />}
-                Save
+              <button onClick={handleManualSave} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-[#004A74] text-[#FED400] rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all animate-in fade-in zoom-in-95">
+                {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save size={14} />} Save
               </button>
            )}
         </div>
@@ -525,14 +444,76 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
                   <FormField label="Research Start Date"><input type="date" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-mono font-bold text-[#004A74]" value={project.startDate} onChange={e => handleUpdateField('startDate', e.target.value)} /></FormField>
                   <FormField label="Target End Date"><input type="date" className="w-full px-5 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-mono font-bold text-[#004A74]" value={project.estEndDate} onChange={e => handleUpdateField('estEndDate', e.target.value)} /></FormField>
                </div>
-               <FormField label="Full Research Title"><textarea className="w-full px-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-sm font-bold text-[#004A74] outline-none focus:bg-white focus:ring-4 focus:ring-[#004A74]/5 transition-all min-h-[100px] resize-none" value={project.title} onChange={e => handleUpdateField('title', e.target.value)} /></FormField>
-               <FormField label="Research Topic / Domain"><div className="relative group"><Target className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" /><input className="w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold text-[#004A74] outline-none focus:bg-white focus:ring-4 focus:ring-[#004A74]/5 transition-all" value={project.topic || ''} onChange={e => handleUpdateField('topic', e.target.value)} /></div></FormField>
-               <FormField label="Problem Justification"><textarea className="w-full px-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-xs font-medium text-gray-600 leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none" value={project.problemStatement || ''} onChange={e => handleUpdateField('problemStatement', e.target.value)} /></FormField>
-               <FormField label="The White Space (Gap)"><div className="relative"><div className="absolute top-0 left-0 w-1.5 h-full bg-[#FED400] rounded-l-[1.5rem]" /><textarea className="w-full px-8 py-5 bg-[#004A74]/5 border border-[#004A74]/10 rounded-[1.5rem] text-xs font-bold text-[#004A74] leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none" value={project.researchGap || ''} onChange={e => handleUpdateField('researchGap', e.target.value)} /></div></FormField>
-               <FormField label="Investigation Question"><div className="relative"><MessageSquare className="absolute left-4 top-5 w-4 h-4 text-gray-300" /><textarea className="w-full pl-11 pr-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-sm font-bold text-[#004A74] italic leading-relaxed outline-none focus:bg-white min-h-[100px] resize-none" value={project.researchQuestion || ''} onChange={e => handleUpdateField('researchQuestion', e.target.value)} /></div></FormField>
-               <FormField label="Approach & Methodology"><div className="relative"><FlaskConical className="absolute left-4 top-5 w-4 h-4 text-gray-300" /><textarea className="w-full pl-11 pr-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-xs font-medium text-gray-600 leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none" value={project.methodology || ''} onChange={e => handleUpdateField('methodology', e.target.value)} /></div></FormField>
-               <FormField label="Targeted Population / Data"><div className="relative"><Users className="absolute left-4 top-5 w-4 h-4 text-gray-300" /><textarea className="w-full pl-11 pr-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-xs font-medium text-gray-600 leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none" value={project.population || ''} onChange={e => handleUpdateField('population', e.target.value)} /></div></FormField>
+               
+               {/* UPGRADED TEXTAREAS TO TRACERFIELD */}
+               <div className="space-y-6">
+                  <TracerField 
+                    label={<span className="flex items-center gap-2"><Target size={14} /> Full Research Title</span>}
+                    value={project.title}
+                    fieldKey="title"
+                    context={project}
+                    onChange={(val) => handleUpdateField('title', val)}
+                    className="w-full px-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-sm font-bold text-[#004A74] outline-none focus:bg-white focus:ring-4 focus:ring-[#004A74]/5 transition-all min-h-[100px] resize-none"
+                  />
+                  
+                  <TracerField 
+                    label={<span className="flex items-center gap-2"><Target size={14} /> Research Topic / Domain</span>}
+                    value={project.topic}
+                    fieldKey="topic"
+                    context={project}
+                    onChange={(val) => handleUpdateField('topic', val)}
+                    className="w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold text-[#004A74] outline-none focus:bg-white focus:ring-4 focus:ring-[#004A74]/5 transition-all"
+                  />
+
+                  <TracerField 
+                     label={<span className="flex items-center gap-2"><MessageSquare size={14} /> Problem Justification</span>}
+                     value={project.problemStatement}
+                     fieldKey="problemStatement"
+                     context={project}
+                     onChange={(val) => handleUpdateField('problemStatement', val)}
+                     className="w-full px-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-xs font-medium text-gray-600 leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none"
+                  />
+
+                  <TracerField 
+                     label={<span className="flex items-center gap-2"><Search size={14} /> The White Space (Gap)</span>}
+                     value={project.researchGap}
+                     fieldKey="researchGap"
+                     context={project}
+                     onChange={(val) => handleUpdateField('researchGap', val)}
+                     isDark={true}
+                     className="w-full px-8 py-5 bg-[#004A74]/5 border border-[#004A74]/10 rounded-[1.5rem] text-xs font-bold text-[#004A74] leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none"
+                  />
+
+                  <TracerField 
+                     label={<span className="flex items-center gap-2"><MessageSquare size={14} /> Investigation Question</span>}
+                     value={project.researchQuestion}
+                     fieldKey="researchQuestion"
+                     context={project}
+                     onChange={(val) => handleUpdateField('researchQuestion', val)}
+                     className="w-full pl-11 pr-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-sm font-bold text-[#004A74] italic leading-relaxed outline-none focus:bg-white min-h-[100px] resize-none"
+                  />
+
+                  <TracerField 
+                     label={<span className="flex items-center gap-2"><FlaskConical size={14} /> Approach & Methodology</span>}
+                     value={project.methodology}
+                     fieldKey="methodology"
+                     context={project}
+                     onChange={(val) => handleUpdateField('methodology', val)}
+                     className="w-full pl-11 pr-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-xs font-medium text-gray-600 leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none"
+                  />
+
+                  <TracerField 
+                     label={<span className="flex items-center gap-2"><Users size={14} /> Targeted Population</span>}
+                     value={project.population}
+                     fieldKey="population"
+                     context={project}
+                     onChange={(val) => handleUpdateField('population', val)}
+                     className="w-full pl-11 pr-6 py-5 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-xs font-medium text-gray-600 leading-relaxed outline-none focus:bg-white min-h-[120px] resize-none"
+                  />
+               </div>
+
                <FormField label="Strategic Keywords"><FormDropdown isMulti multiValues={project.keywords || []} options={[]} onAddMulti={v => handleUpdateField('keywords', [...(project.keywords || []), v])} onRemoveMulti={v => handleUpdateField('keywords', (project.keywords || []).filter(k => k !== v))} placeholder="Keywords..." value="" onChange={()=>{}} /></FormField>
+               
                <div className="pt-6 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField label="Author Team"><FormDropdown isMulti multiValues={project.authors || []} options={[cleanedProfileName]} onAddMulti={v => handleUpdateField('authors', [...(project.authors || []), v])} onRemoveMulti={v => handleUpdateField('authors', (project.authors || []).filter(a => a !== v))} placeholder="Add members..." value="" onChange={()=>{}} /></FormField>
                   <FormField label="Status"><FormDropdown value={project.status} options={Object.values(TracerStatus)} onChange={v => handleUpdateField('status', v)} placeholder="Status" allowCustom={false} showSearch={false} /></FormField>
@@ -580,7 +561,6 @@ const TracerDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ libraryItems 
         </div>
       </div>
 
-      {/* Fix: Added implementation of the missing modals used by current matrix and detail functionality */}
       {isSelectorOpen && (
         <ResearchSourceSelectorModal 
           onClose={() => setIsSelectorOpen(false)}

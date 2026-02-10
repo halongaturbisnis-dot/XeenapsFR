@@ -1,5 +1,6 @@
 
 
+
 import { TracerProject, TracerLog, TracerReference, TracerTodo, TracerFinanceItem, TracerFinanceContent, GASResponse, TracerLogContent, TracerReferenceContent } from '../types';
 import { GAS_WEB_APP_URL } from '../constants';
 import { 
@@ -21,13 +22,84 @@ import {
   fetchAllPendingTodosFromSupabase
 } from './TracerSupabaseService';
 import { deleteRemoteFile } from './ActivityService';
-import { fetchFileContent } from './gasService';
+import { fetchFileContent, callAiProxy } from './gasService';
 
 /**
  * XEENAPS TRACER SERVICE (HYBRID ARCHITECTURE)
  * Metadata: Supabase
  * Payload: Google Apps Script (Sharding)
  */
+
+// --- AI & UTILS ---
+
+export const translateTracerField = async (
+  text: string, 
+  targetLang: string
+): Promise<string | null> => {
+  if (!text) return null;
+  const prompt = `TRANSLATE THE FOLLOWING TEXT TO ${targetLang}.
+  REQUIREMENTS:
+  1. Maintain research/academic tone.
+  2. Preserve any HTML tags if present.
+  3. RETURN ONLY THE TRANSLATED TEXT.
+  
+  TEXT:
+  "${text}"`;
+
+  try {
+    const response = await callAiProxy('gemini', prompt);
+    return response ? response.trim() : null;
+  } catch (e) {
+    console.error("Tracer Translation failed:", e);
+    return null;
+  }
+};
+
+export const refineTracerField = async (
+  fieldName: string,
+  currentValue: string,
+  context: TracerProject,
+  mode: 'REWRITE' | 'EXPAND'
+): Promise<string | null> => {
+  const contextMini = {
+    title: context.title || context.label,
+    topic: context.topic,
+    problem: context.problemStatement,
+    gap: context.researchGap,
+    question: context.researchQuestion,
+    methodology: context.methodology,
+    population: context.population
+  };
+
+  const instruction = mode === 'REWRITE' 
+    ? `Please REWRITE the '${fieldName}' field. Make it more professional, concise, and scientifically aligned with the Research Context.` 
+    : `Please EXPAND the '${fieldName}' field. Add detail, depth, and rigorous academic nuance based on the project context.`;
+
+  const prompt = `ACT AS A SENIOR RESEARCH AUDITOR.
+  Based on the project context below, perform the following action.
+  
+  CONTEXT JSON:
+  ${JSON.stringify(contextMini)}
+
+  TARGET FIELD: "${fieldName}"
+  CURRENT VALUE: "${currentValue}"
+  ACTION: ${mode}
+
+  INSTRUCTION: ${instruction}
+
+  --- RULES ---
+  1. RETURN ONLY THE NEW TEXT STRING. NO CONVERSATION.
+  2. STRICTLY DO NOT USE Markdown symbols.
+  3. LANGUAGE: English (Academic).`;
+
+  try {
+    const response = await callAiProxy('gemini', prompt);
+    return response ? response.trim() : null;
+  } catch (e) {
+    console.error("Refine Tracer field failed:", e);
+    return null;
+  }
+};
 
 // --- 1. PROJECTS ---
 

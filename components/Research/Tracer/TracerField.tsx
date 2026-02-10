@@ -6,29 +6,28 @@ import {
   Maximize2, 
   Loader2,
   X,
-  Target,
-  Languages
+  Languages,
+  BrainCog
 } from 'lucide-react';
-import { BrainstormingItem, TracerProject } from '../../../types';
-import { refineBrainstormingField, translateSingleField } from '../../../services/BrainstormingService';
-import { saveTracerProject } from '../../../services/TracerService';
+import { TracerProject, BrainstormingItem } from '../../../types';
+import { refineTracerField, translateTracerField } from '../../../services/TracerService';
 import { showXeenapsToast } from '../../../utils/toastUtils';
-import TracerProjectPicker from '../Tracer/TracerProjectPicker';
+import BrainstormingPicker from '../Brainstorming/BrainstormingPicker';
 
-interface BrainstormingFieldProps {
+interface TracerFieldProps {
   label: React.ReactNode;
   value: string;
-  fieldKey: keyof BrainstormingItem; // The actual key in the data object
-  context: BrainstormingItem; // The full object for context
+  fieldKey: keyof TracerProject; 
+  context: TracerProject; 
   onChange: (val: string) => void;
-  onSave?: (val: string) => void; // Optional trigger for auto-save
-  className?: string; // Custom class for textarea styling
-  isDark?: boolean; // For fields with dark background (like Gap)
+  onSave?: (val: string) => void;
+  className?: string;
+  isDark?: boolean;
   placeholder?: string;
   minHeight?: string;
 }
 
-const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
+const TracerField: React.FC<TracerFieldProps> = ({
   label,
   value,
   fieldKey,
@@ -42,11 +41,10 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isTracerPickerOpen, setIsTracerPickerOpen] = useState(false);
+  const [isBrainstormingPickerOpen, setIsBrainstormingPickerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize logic extracted here for encapsulation
   const adjustHeight = () => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -72,18 +70,14 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
     setIsMenuOpen(false);
     setIsLoading(true);
     
-    // Toast handled by service or here? Let's do generic feedback here.
-    const modeLabel = mode === 'REWRITE' ? 'Rewriting' : 'Expanding';
-    
     try {
-      const result = await refineBrainstormingField(fieldKey as string, value, context, mode);
+      const result = await refineTracerField(fieldKey as string, value, context, mode);
       if (result) {
         onChange(result);
-        if (onSave) onSave(result); // Trigger auto-save if provided
+        if (onSave) onSave(result);
       }
     } catch (e) {
-      console.error(e);
-      showXeenapsToast('error', `Failed to ${modeLabel.toLowerCase()} content.`);
+      showXeenapsToast('error', `Failed to process content.`);
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +87,7 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
     setIsMenuOpen(false);
     setIsLoading(true);
     try {
-       const result = await translateSingleField(value, lang);
+       const result = await translateTracerField(value, lang);
        if (result) {
          onChange(result);
          if (onSave) onSave(result);
@@ -105,56 +99,48 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
     }
   };
 
-  // MAPPING Logic for Export
-  const getTracerKey = (bsKey: string): keyof TracerProject | null => {
-    if (bsKey === 'proposedTitle') return 'title';
-    if (bsKey === 'problemStatement') return 'problemStatement';
-    if (bsKey === 'researchGap') return 'researchGap';
-    if (bsKey === 'researchQuestion') return 'researchQuestion';
-    if (bsKey === 'methodology') return 'methodology';
-    if (bsKey === 'population') return 'population';
-    return null; // No direct mapping
+  const getBrainstormingKey = (tracerKey: string): keyof BrainstormingItem | null => {
+    if (tracerKey === 'title') return 'proposedTitle';
+    if (tracerKey === 'problemStatement') return 'problemStatement';
+    if (tracerKey === 'researchGap') return 'researchGap';
+    if (tracerKey === 'researchQuestion') return 'researchQuestion';
+    if (tracerKey === 'methodology') return 'methodology';
+    if (tracerKey === 'population') return 'population';
+    return null;
   };
 
-  const handleExportToTracer = async (project: TracerProject) => {
-    setIsTracerPickerOpen(false);
-    const targetKey = getTracerKey(fieldKey as string);
-    
-    if (!targetKey) {
-      showXeenapsToast('warning', 'This field cannot be mapped to Tracer.');
-      return;
+  const handleImportFromBrainstorming = (source: BrainstormingItem) => {
+    setIsBrainstormingPickerOpen(false);
+    const sourceKey = getBrainstormingKey(fieldKey as string);
+    if (!sourceKey) {
+       showXeenapsToast('warning', 'No matching field in Brainstorming.');
+       return;
     }
-
-    try {
-      const updatedProject = { ...project, [targetKey]: value, updatedAt: new Date().toISOString() };
-      const success = await saveTracerProject(updatedProject);
-      if (success) {
-        showXeenapsToast('success', `Exported to ${project.label}`);
-      } else {
-        throw new Error("Save failed");
-      }
-    } catch (e) {
-      showXeenapsToast('error', 'Export failed');
+    
+    const sourceVal = source[sourceKey];
+    if (sourceVal && typeof sourceVal === 'string') {
+      onChange(sourceVal);
+      if (onSave) onSave(sourceVal);
+      showXeenapsToast('success', `Imported from ${source.label}`);
+    } else {
+      showXeenapsToast('info', 'Source field is empty.');
     }
   };
 
   return (
     <div className="space-y-3 relative group/field">
-      {/* Label */}
       <label className={`text-[9px] font-black uppercase tracking-widest flex items-center gap-2 ${isDark ? 'text-gray-400' : 'text-[#004A74]'}`}>
         {label}
       </label>
 
-      {/* Picker Modal */}
-      {isTracerPickerOpen && (
-        <TracerProjectPicker 
-          onClose={() => setIsTracerPickerOpen(false)} 
-          onSelect={handleExportToTracer} 
+      {isBrainstormingPickerOpen && (
+        <BrainstormingPicker 
+           onClose={() => setIsBrainstormingPickerOpen(false)}
+           onSelect={handleImportFromBrainstorming}
         />
       )}
 
       <div className="relative">
-        {/* Magic Button (Absolute Top Right) */}
         {!isLoading && (
           <div className="absolute top-2 right-2 z-20" ref={menuRef}>
             <button
@@ -166,7 +152,7 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
                   ? 'bg-white/10 text-white hover:bg-white hover:text-[#004A74]' 
                   : 'bg-white border border-gray-100 text-[#004A74] hover:bg-[#FED400]/20'
               }`}
-              title="AI Co-Pilot"
+              title="AI Co-Pilot & Tools"
               type="button"
             >
               <Sparkles size={14} />
@@ -204,18 +190,17 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
 
                 <div className="h-px bg-gray-50 my-1" />
                 <button 
-                  onClick={() => { setIsMenuOpen(false); setIsTracerPickerOpen(true); }}
+                  onClick={() => { setIsMenuOpen(false); setIsBrainstormingPickerOpen(true); }}
                   className="w-full text-left px-3 py-2.5 text-[10px] font-bold text-[#004A74] hover:bg-gray-50 rounded-lg transition-all flex items-center gap-2"
                   type="button"
                 >
-                   <Target size={12} className="text-[#FED400] fill-[#FED400]" /> Export to Tracer
+                   <BrainCog size={12} className="text-purple-500" /> Import from Idea
                 </button>
               </div>
             )}
           </div>
         )}
 
-        {/* Loading Overlay */}
         {isLoading && (
           <div className="absolute inset-0 z-10 bg-white/50 backdrop-blur-[1px] flex items-center justify-center rounded-3xl">
              <div className="flex items-center gap-2 px-4 py-2 bg-white shadow-lg rounded-full border border-gray-100">
@@ -225,7 +210,6 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
           </div>
         )}
 
-        {/* Textarea */}
         <textarea
           ref={textareaRef}
           className={`${className} min-h-[${minHeight}]`}
@@ -243,4 +227,4 @@ const BrainstormingField: React.FC<BrainstormingFieldProps> = ({
   );
 };
 
-export default BrainstormingField;
+export default TracerField;
