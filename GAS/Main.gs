@@ -1,8 +1,8 @@
 
-
-
 /**
- * XEENAPS PKM - MAIN ROUTER
+ * XEENAPS PKM - MAIN ROUTER (LIGHTWEIGHT WORKER MODE)
+ * Metadata Registry has moved to Supabase.
+ * GAS now acts as: AI Proxy, PDF Generator, File Sharding Storage, & External API Gateway.
  */
 
 function doGet(e) {
@@ -24,23 +24,9 @@ function doGet(e) {
       return createJsonResponse({ status: 'success', content: content });
     }
 
-    if (action === 'getLibrary') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const type = e.parameter.type || "All";
-      const path = e.parameter.path || "";
-      const sortKey = e.parameter.sortKey || "createdAt";
-      const sortDir = e.parameter.sortDir || "desc";
-      
-      const result = getPaginatedItems(CONFIG.SPREADSHEETS.LIBRARY, "Collections", page, limit, search, type, path, sortKey, sortDir);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
     // NEW: getNotifications with Server-Side Date Filtering
     // Note: In Hybrid mode, Sharbox notifications are mostly handled by Supabase client-side, 
     // but this endpoint might still be used for legacy or specific checks if needed. 
-    // We keep it compatible but lighter.
     if (action === 'getNotifications') {
       // For Inbox Buffer Strategy: GAS checks Sheet Inbox (Buffer) to notify of PENDING syncs
       const bufferItems = getInboxBufferFromRegistry(); 
@@ -62,128 +48,6 @@ function doGet(e) {
       return createJsonResponse({ status: 'success', data: result });
     }
 
-    // DEPRECATED: getSharboxItems (Direct read from sheet is now only for buffer)
-    // if (action === 'getSharboxItems') { ... }
-
-    // DEPRECATED: getNotes (Moved to Supabase)
-    // if (action === 'getNotes') { ... }
-
-    // NEW: Tracer Project Retrieval
-    if (action === 'getTracerProjects') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const result = getTracerProjectsFromRegistry(page, limit, search);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: Tracer Log Retrieval
-    if (action === 'getTracerLogs') {
-      const projectId = e.parameter.projectId;
-      const result = getTracerLogsFromRegistry(projectId);
-      return createJsonResponse({ status: 'success', data: result });
-    }
-
-    // NEW: Tracer Reference Retrieval
-    if (action === 'getTracerReferences') {
-      const projectId = e.parameter.projectId;
-      const result = getTracerReferencesFromRegistry(projectId);
-      return createJsonResponse({ status: 'success', data: result });
-    }
-
-    // NEW: Tracer Todo Retrieval
-    if (action === 'getTracerTodos') {
-      const projectId = e.parameter.projectId;
-      const result = getTracerTodosFromRegistry(projectId);
-      return createJsonResponse({ status: 'success', data: result });
-    }
-
-    // NEW: Tracer Finance Retrieval
-    if (action === 'getTracerFinance') {
-      const projectId = e.parameter.projectId;
-      const startDate = e.parameter.startDate || "";
-      const endDate = e.parameter.endDate || "";
-      const search = e.parameter.search || "";
-      const result = getTracerFinanceFromRegistry(projectId, startDate, endDate, search);
-      return createJsonResponse({ status: 'success', data: result });
-    }
-
-    // NEW: Tracer Finance Export (STITCHING ENGINE)
-    if (action === 'getFinanceExportData') {
-      const projectId = e.parameter.projectId;
-      const result = getFinanceExportDataFromRegistry(projectId);
-      return createJsonResponse({ status: 'success', data: result });
-    }
-
-    // NEW: getReviews (LITERATURE REVIEW MODULE)
-    if (action === 'getReviews') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "20");
-      const search = e.parameter.search || "";
-      const sortKey = e.parameter.sortKey || "createdAt";
-      const sortDir = e.parameter.sortDir || "desc";
-      const result = getReviewsFromRegistry(page, limit, search, sortKey, sortDir);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // DEPRECATED: getConsultations (Moved to Supabase)
-    // if (action === 'getConsultations') { ... }
-
-    // DEPRECATED: getColleagues (Moved to Supabase)
-    // if (action === 'getColleagues') { ... }
-
-    // NEW: getTeaching (UPDATED FOR SERVER-SIDE DATE FILTERING)
-    if (action === 'getTeaching') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const startDate = e.parameter.startDate || "";
-      const endDate = e.parameter.endDate || "";
-      const result = getTeachingFromRegistry(page, limit, search, startDate, endDate);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getActivities (UPDATED FOR FILTERS)
-    if (action === 'getActivities') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const type = e.parameter.type || "All";
-      const startDate = e.parameter.startDate || "";
-      const endDate = e.parameter.endDate || "";
-      const result = getActivitiesFromRegistry(page, limit, search, startDate, endDate, type);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: Profile Retrieval
-    if (action === 'getProfile') {
-      return createJsonResponse({ status: 'success', data: getProfileFromRegistry() });
-    }
-
-    // NEW: Education History Retrieval
-    if (action === 'getEducation') {
-      return createJsonResponse({ status: 'success', data: getEducationFromRegistry() });
-    }
-
-    // NEW: Career History Retrieval
-    if (action === 'getCareer') {
-      return createJsonResponse({ status: 'success', data: getCareerFromRegistry() });
-    }
-
-    // NEW: getPublication
-    if (action === 'getPublication') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const result = getPublicationFromRegistry(page, limit, search);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: CV List Retrieval
-    if (action === 'getCVList') {
-      return createJsonResponse({ status: 'success', data: getCVFromRegistry() });
-    }
-
     // NEW: searchGlobalArticles (Proxy for OpenAlex)
     if (action === 'searchGlobalArticles') {
       return createJsonResponse(handleGlobalArticleSearch(e.parameter));
@@ -192,116 +56,6 @@ function doGet(e) {
     // NEW: searchGlobalBooks (Proxy for Open Library)
     if (action === 'searchGlobalBooks') {
       return createJsonResponse(handleGlobalBookSearch(e.parameter));
-    }
-
-    // NEW: getArchivedArticles (UPDATED FOR PAGINATION & SEARCH)
-    if (action === 'getArchivedArticles') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const sortKey = e.parameter.sortKey || "createdAt";
-      const sortDir = e.parameter.sortDir || "desc";
-      
-      const result = getArchivedArticlesFromRegistry(page, limit, search, sortKey, sortDir);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getArchivedBooks
-    if (action === 'getArchivedBooks') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const sortKey = e.parameter.sortKey || "createdAt";
-      const sortDir = e.parameter.sortDir || "desc";
-      
-      const result = getArchivedBooksFromRegistry(page, limit, search, sortKey, sortDir);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getBrainstorming
-    if (action === 'getBrainstorming') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const result = getBrainstormingFromRegistry(page, limit, search);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getResearchProjects
-    if (action === 'getResearchProjects') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const result = getResearchProjectsFromRegistry(page, limit, search);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getProjectSources
-    if (action === 'getProjectSources') {
-      const projectId = e.parameter.projectId;
-      return createJsonResponse({ status: 'success', data: getProjectSourcesFromRegistry(projectId) });
-    }
-
-    // NEW: getGapLog (Research Gap Log Retrieval)
-    if (action === 'getGapLog') {
-      const sourceId = e.parameter.sourceId;
-      return createJsonResponse({ status: 'success', data: getGapLogsBySource(sourceId) });
-    }
-
-    // NEW: getRelatedPresentations (UPDATED FOR PAGINATION)
-    if (action === 'getRelatedPresentations') {
-      const collectionId = e.parameter.collectionId;
-      if (!collectionId) return createJsonResponse({ status: 'error', message: 'No collectionId provided' });
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "20");
-      const search = e.parameter.search || "";
-      const sortKey = e.parameter.sortKey || "createdAt";
-      const sortDir = e.parameter.sortDir || "desc";
-      
-      const result = getPresentationsByCollection(collectionId, page, limit, search, sortKey, sortDir);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getAllPresentations (UPDATED FOR PARAMETERS)
-    if (action === 'getAllPresentations') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "25");
-      const search = e.parameter.search || "";
-      const sortKey = e.parameter.sortKey || "createdAt";
-      const sortDir = e.parameter.sortDir || "desc";
-      const startDate = e.parameter.startDate || "";
-      const endDate = e.parameter.endDate || "";
-      
-      const result = getAllPresentationsFromRegistry(page, limit, search, sortKey, sortDir, startDate, endDate);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getQuestionsByCollection (MODIFIED FOR PAGINATION & SEARCH)
-    if (action === 'getQuestionsByCollection') {
-      const collectionId = e.parameter.collectionId;
-      if (!collectionId) return createJsonResponse({ status: 'error', message: 'No collectionId provided' });
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "20");
-      const search = e.parameter.search || "";
-      const bloomFilter = e.parameter.bloomFilter || "All";
-      
-      const result = getQuestionsFromRegistry(collectionId, page, limit, search, bloomFilter);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
-    }
-
-    // NEW: getAllQuestions (GLOBAL)
-    if (action === 'getAllQuestions') {
-      const page = parseInt(e.parameter.page || "1");
-      const limit = parseInt(e.parameter.limit || "20");
-      const search = e.parameter.search || "";
-      const bloomFilter = e.parameter.bloomFilter || "All";
-      const startDate = e.parameter.startDate || "";
-      const endDate = e.parameter.endDate || "";
-      const sortKey = e.parameter.sortKey || "createdAt";
-      const sortDir = e.parameter.sortDir || "desc";
-      
-      const result = getAllQuestionsFromRegistry(page, limit, search, bloomFilter, startDate, endDate, sortKey, sortDir);
-      return createJsonResponse({ status: 'success', data: result.items, totalCount: result.totalCount });
     }
 
     if (action === 'getAiConfig') return createJsonResponse({ status: 'success', data: getProviderModel('GEMINI') });
@@ -327,21 +81,8 @@ function doPost(e) {
       return createJsonResponse(handleApiKeyManager(body));
     }
   
-    if (action === 'setupDatabase') return createJsonResponse(setupDatabase());
+    // Only Sharbox setup remains in GAS (for Buffer Sheet)
     if (action === 'setupSharboxDatabase') return createJsonResponse(setupSharboxDatabase());
-    // NOTEBOOK SETUP DEPRECATED: if (action === 'setupNotebookDatabase') ...
-    // COLLEAGUE SETUP DEPRECATED: if (action === 'setupColleagueDatabase') ...
-    if (action === 'setupTeachingDatabase') return createJsonResponse(setupTeachingDatabase());
-    if (action === 'setupResearchDatabase') return createJsonResponse(setupResearchDatabase());
-    if (action === 'setupBrainstormingDatabase') return createJsonResponse(setupBrainstormingDatabase());
-    if (action === 'setupPublicationDatabase') return createJsonResponse(setupPublicationDatabase());
-    if (action === 'setupProfileDatabase') return createJsonResponse(setupProfileDatabase());
-    if (action === 'setupActivitiesDatabase') return createJsonResponse(setupActivitiesDatabase());
-    if (action === 'setupCVDatabase') return createJsonResponse(setupCVDatabase());
-    if (action === 'setupConsultationDatabase') return createJsonResponse(setupConsultationDatabase());
-    if (action === 'setupReviewDatabase') return createJsonResponse(setupReviewDatabase());
-    if (action === 'setupTracerDatabase') return createJsonResponse(setupTracerDatabase());
-    if (action === 'setupBookArchiveDatabase') return createJsonResponse(setupBookArchiveDatabase());
     
     // NEW: Sharbox Actions (Updated for Inbox Buffer)
     // FIX: Pass senderProfile from body to handleSendToSharbox
@@ -356,46 +97,11 @@ function doPost(e) {
     ));
     if (action === 'clearInboxBuffer') return createJsonResponse(clearInboxBuffer(body.ids)); // New Buffer Cleanup
     
-    // Legacy Sharbox Actions (Deprecated or moved to Supabase logic, but maintained if needed by old buffer)
+    // Legacy Sharbox Actions
     if (action === 'claimSharboxItem') return createJsonResponse(handleClaimSharboxItem(body.id)); 
-    // markSharboxRead & deleteSharboxItem now handled by Supabase for final storage, 
-    // but clearing buffer is key.
 
     // MODIFIED: saveNoteContent (Worker Only)
     if (action === 'saveNoteContent') return createJsonResponse(saveNoteContentToDrive(body.item, body.content));
-    // DEPRECATED: deleteNote (Frontend handles via deleteRemoteFiles)
-    // if (action === 'deleteNote') ...
-
-    // NEW: saveTracerProject
-    if (action === 'saveTracerProject') return createJsonResponse(saveTracerProjectToRegistry(body.item));
-    // NEW: deleteTracerProject
-    if (action === 'deleteTracerProject') return createJsonResponse(deleteTracerProjectFromRegistry(body.id));
-    // NEW: saveTracerLog
-    if (action === 'saveTracerLog') return createJsonResponse(saveTracerLogToRegistry(body.item, body.content));
-    // NEW: deleteTracerLog
-    if (action === 'deleteTracerLog') return createJsonResponse(deleteTracerLogFromRegistry(body.id));
-    // NEW: linkTracerReference
-    if (action === 'linkTracerReference') return createJsonResponse(linkTracerReferenceToRegistry(body.item));
-    // NEW: unlinkTracerReference
-    if (action === 'unlinkTracerReference') return createJsonResponse(unlinkTracerReferenceFromRegistry(body.id));
-    // NEW: saveReferenceContent
-    if (action === 'saveReferenceContent') return createJsonResponse(saveReferenceContentToRegistry(body.item, body.content));
-    
-    // NEW: Tracer Todo
-    if (action === 'saveTracerTodo') return createJsonResponse(saveTracerTodoToRegistry(body.item));
-    if (action === 'deleteTracerTodo') return createJsonResponse(deleteTracerTodoFromRegistry(body.id));
-
-    // NEW: Tracer Finance
-    if (action === 'saveTracerFinance') return createJsonResponse(saveTracerFinanceToRegistry(body.item, body.content));
-    if (action === 'deleteTracerFinance') return createJsonResponse(deleteTracerFinanceFromRegistry(body.id));
-
-    // NEW: Tracer Finance Premium Export (Excel/PDF)
-    // MOVED FROM GET TO POST TO HANDLE LARGE PAYLOADS FROM SUPABASE
-    if (action === 'generateFinanceExport') {
-      const { payload } = body;
-      const result = generateFinanceExportFileFromRegistry(payload);
-      return createJsonResponse(result);
-    }
 
     // NEW: aiTracerProxy
     if (action === 'aiTracerProxy') {
@@ -404,10 +110,6 @@ function doPost(e) {
       if (subAction === 'enhanceQuote') return createJsonResponse(handleAiTracerQuoteEnhancement(payload));
     }
 
-    // NEW: saveReview
-    if (action === 'saveReview') return createJsonResponse(saveReviewToRegistry(body.item, body.content));
-    // NEW: deleteReview
-    if (action === 'deleteReview') return createJsonResponse(deleteReviewFromRegistry(body.id));
     // NEW: aiReviewProxy
     if (action === 'aiReviewProxy') return createJsonResponse(handleAiReviewRequest(body.subAction, body.payload));
     
@@ -427,135 +129,15 @@ function doPost(e) {
       return createJsonResponse(saveConsultationContentToDrive(body.item, body.answerContent));
     }
     
-    // DEPRECATED: deleteConsultation (Frontend orchestrates deletions)
-    // if (action === 'deleteConsultation') { ... }
-
     // NEW ACTION: aiConsultProxy
     if (action === 'aiConsultProxy') {
       return createJsonResponse(handleAiConsultRequest(body.collectionId, body.question));
-    }
-
-    // DEPRECATED: saveColleague (Moved to Supabase)
-    // if (action === 'saveColleague') { ... }
-    
-    // DEPRECATED: deleteColleague (Moved to Supabase)
-    // if (action === 'deleteColleague') { ... }
-
-    // NEW ACTION: saveTeaching
-    if (action === 'saveTeaching') {
-      return createJsonResponse(saveTeachingToRegistry(body.item));
-    }
-    // NEW ACTION: deleteTeaching
-    if (action === 'deleteTeaching') {
-      return createJsonResponse(deleteTeachingFromRegistry(body.id));
-    }
-
-    // NEW ACTION: saveProfile
-    if (action === 'saveProfile') {
-      return createJsonResponse(saveProfileToRegistry(body.item));
-    }
-
-    // NEW ACTION: saveEducation
-    if (action === 'saveEducation') {
-      return createJsonResponse(saveEducationToRegistry(body.item));
-    }
-    // NEW ACTION: deleteEducation
-    if (action === 'deleteEducation') {
-      return createJsonResponse(deleteEducationFromRegistry(body.id));
-    }
-
-    // NEW ACTION: saveCareer
-    if (action === 'saveCareer') {
-      return createJsonResponse(saveCareerToRegistry(body.item));
-    }
-    // NEW ACTION: deleteCareer
-    if (action === 'deleteCareer') {
-      return createJsonResponse(deleteCareerFromRegistry(body.id));
-    }
-
-    // NEW ACTION: savePublication
-    if (action === 'savePublication') {
-      return createJsonResponse(savePublicationToRegistry(body.item));
-    }
-    // NEW ACTION: deletePublication
-    if (action === 'deletePublication') {
-      return createJsonResponse(deletePublicationFromRegistry(body.id));
-    }
-
-    // NEW ACTION: saveActivity
-    if (action === 'saveActivity') {
-      return createJsonResponse(saveActivityToRegistry(body.item));
-    }
-    // NEW ACTION: deleteActivity
-    if (action === 'deleteActivity') {
-      return createJsonResponse(deleteActivityFromRegistry(body.id));
-    }
-
-    // NEW ACTION: deleteCV
-    if (action === 'deleteCV') {
-      return createJsonResponse(deleteCVFromRegistry(body.id));
     }
 
     // NEW ACTION: generateCV_PDF
     if (action === 'generateCV_PDF') {
       // FIX: Pass FULL BODY so engine can extract payload properly
       return createJsonResponse(handleGenerateCV_PDF(body));
-    }
-
-    // NEW ACTION: saveArchivedArticle
-    if (action === 'saveArchivedArticle') {
-      return createJsonResponse(saveArchivedArticleToRegistry(body.item));
-    }
-    // NEW ACTION: deleteArchivedArticle
-    if (action === 'deleteArchivedArticle') {
-      return createJsonResponse(deleteArchivedArticleFromRegistry(body.id));
-    }
-    // NEW ACTION: toggleFavoriteArticle
-    if (action === 'toggleFavoriteArticle') {
-      return createJsonResponse(toggleFavoriteArticleInRegistry(body.id, body.status));
-    }
-
-    // NEW ACTION: saveArchivedBook
-    if (action === 'saveArchivedBook') {
-      return createJsonResponse(saveArchivedBookToRegistry(body.item));
-    }
-    // NEW ACTION: deleteArchivedBook
-    if (action === 'deleteArchivedBook') {
-      return createJsonResponse(deleteArchivedBookFromRegistry(body.id));
-    }
-    // NEW ACTION: toggleFavoriteBook
-    if (action === 'toggleFavoriteBook') {
-      return createJsonResponse(toggleFavoriteBookInRegistry(body.id, body.status));
-    }
-
-    // NEW ACTION: saveBrainstorming
-    if (action === 'saveBrainstorming') {
-      return createJsonResponse(saveBrainstormingToRegistry(body.item));
-    }
-
-    // NEW ACTION: deleteBrainstorming
-    if (action === 'deleteBrainstorming') {
-      return createJsonResponse(deleteBrainstormingFromRegistry(body.id));
-    }
-
-    // NEW ACTION: saveResearchProject
-    if (action === 'saveResearchProject') {
-      return createJsonResponse(saveResearchProjectToRegistry(body.project));
-    }
-
-    // NEW ACTION: deleteResearchProject
-    if (action === 'deleteResearchProject') {
-      return createJsonResponse(deleteResearchProjectFromRegistry(body.id));
-    }
-
-    // NEW ACTION: saveProjectSource
-    if (action === 'saveProjectSource') {
-      return createJsonResponse(saveProjectSourceToRegistry(body.source));
-    }
-
-    // NEW ACTION: deleteProjectSource
-    if (action === 'deleteProjectSource') {
-      return createJsonResponse(deleteProjectSourceFromRegistry(body.id));
     }
 
     // NEW ACTION: translateResearchSource
@@ -577,11 +159,6 @@ function doPost(e) {
       const { fileId, nodeUrl } = body;
       const snippet = getHybridSnippet(fileId, nodeUrl);
       return createJsonResponse({ status: 'success', snippet: snippet });
-    }
-
-    // NEW ACTION: saveGapLog (Persistence for Research Analysis)
-    if (action === 'saveGapLog') {
-      return createJsonResponse(saveGapLog(body.log));
     }
 
     // NEW ACTION: generateCitations
@@ -609,16 +186,6 @@ function doPost(e) {
     // NEW ACTION: generateQuestionsAI
     if (action === 'generateQuestionsAI') {
       return createJsonResponse(handleGenerateQuestions(body));
-    }
-
-    // NEW ACTION: saveQuestion
-    if (action === 'saveQuestion') {
-      return createJsonResponse(saveQuestionToRegistry(body.item));
-    }
-
-    // NEW ACTION: deleteQuestionRecord
-    if (action === 'deleteQuestionRecord') {
-      return createJsonResponse(deleteQuestionFromRegistry(body.id));
     }
 
     // NEW ACTION: translateInsightSection (TRANSLATION + TOTAL REWRITE)
@@ -734,56 +301,27 @@ function doPost(e) {
       return createJsonResponse({ status: 'success' });
     }
     
+    // ACTION: saveItem (Library Item Worker - Content Only)
+    // Modified: Removes Metadata Registry to Sheet. Only handles File/Content Sharding.
     if (action === 'saveItem') {
       const item = body.item;
       // SYSTEM ASSET GUARD: Avoid sharding/AI for internal assets
       const isSystemAsset = (String(item.id).toUpperCase() === 'PHOTO_PROFILE');
       
-      // FINAL SANITIZATION: Decoding HTML Entities before saving to Sheet
-      if (item.title) item.title = decodeHtmlEntities(item.title);
-      if (item.publisher) item.publisher = decodeHtmlEntities(item.publisher);
-      if (item.journalName) item.journalName = decodeHtmlEntities(item.journalName);
-      if (Array.isArray(item.authors)) {
-        item.authors = item.authors.map(a => decodeHtmlEntities(a));
-      }
-
       const extractedText = body.extractedText || "";
-      const isFileUpload = (body.file && body.file.fileData);
-
-      // --- SELF-HEALING MECHANISM: Supporting References (Atomic Protection) ---
-      if (!item.supportingReferences || (Array.isArray(item.supportingReferences.references) && item.supportingReferences.references.length === 0)) {
-         const keywords = (item.tags && Array.isArray(item.tags.keywords)) ? item.tags.keywords : [];
-         if (keywords.length > 0) {
-            try {
-               item.supportingReferences = {
-                  references: getSupportingReferencesFromOpenAlex(keywords) || [],
-                  videoUrl: getYoutubeRecommendation(keywords) || ""
-               };
-            } catch (healErr) {
-               console.warn("Self-healing enrichment failed: " + healErr.toString());
-            }
-         }
-      }
       
       // Determine required threshold based on method
+      const isFileUpload = (body.file && body.file.fileData);
       const threshold = isFileUpload ? CONFIG.STORAGE.THRESHOLD : CONFIG.STORAGE.CRITICAL_THRESHOLD;
       const storageTarget = getViableStorageTarget(threshold);
 
       // STORAGE GUARD: If no storage (Master or any Slaves) has enough space
       if (!storageTarget) {
-        if (isFileUpload) {
-          return createJsonResponse({ 
-            status: 'error', 
-            title: 'REGISTERING FAILED', 
-            message: 'Your Storage tidak cukup, daftarkan storage baru atau gunakan metode save link atau identifier' 
-          });
-        } else {
-          return createJsonResponse({ 
-            status: 'error', 
-            title: 'REGISTERING FAILED', 
-            message: 'Your Storage is critical (below 2GB). Please register a new storage node to continue.' 
-          });
-        }
+        return createJsonResponse({ 
+          status: 'error', 
+          title: 'REGISTERING FAILED', 
+          message: 'Your Storage is critical (below 2GB). Please register a new storage node to continue.' 
+        });
       }
 
       item.storageNodeUrl = storageTarget.url;
@@ -850,15 +388,7 @@ function doPost(e) {
         }
       }
 
-      if (item.url && (item.url.includes('youtube.com') || item.url.includes('youtu.be'))) {
-        const ytid = extractYoutubeId(item.url);
-        if (ytid) item.youtubeId = 'https://www.youtube.com/embed/' + ytid;
-      }
-      
-      // Khusus untuk Library Item (Bukan Foto Profil)
-      if (!isSystemAsset) {
-        saveToSheet(CONFIG.SPREADSHEETS.LIBRARY, "Collections", item);
-      }
+      // Removed saveToSheet(...) call. Metadata is now handled by Supabase in frontend.
       
       return createJsonResponse({ 
         status: 'success', 
@@ -867,11 +397,6 @@ function doPost(e) {
         extractedJsonId: item.extractedJsonId,
         insightJsonId: item.insightJsonId
       });
-    }
-    
-    if (action === 'deleteItem') {
-      deleteFromSheet(CONFIG.SPREADSHEETS.LIBRARY, "Collections", body.id);
-      return createJsonResponse({ status: 'success' });
     }
     
     if (action === 'extractOnly') {
@@ -1035,5 +560,42 @@ function doPost(e) {
     return createJsonResponse({ status: 'error', message: 'Invalid action: ' + action });
   } catch (err) {
     return { status: 'error', message: err.toString() };
+  }
+}
+
+/**
+ * ------------------------------------------------------------------
+ * XEENAPS KEEP-ALIVE SYSTEM
+ * Mencegah Project Supabase Pause karena inaktivitas.
+ * ------------------------------------------------------------------
+ */
+function keepSupabaseAlive() {
+  const scriptProps = PropertiesService.getScriptProperties();
+  const SUPABASE_URL = scriptProps.getProperty('SUPABASE_URL');
+  const SUPABASE_KEY = scriptProps.getProperty('SUPABASE_KEY');
+
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error("Keep-Alive Skipped: Harap set SUPABASE_URL dan SUPABASE_KEY di Script Properties.");
+    return;
+  }
+
+  try {
+    const targetUrl = `${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1`;
+    
+    const options = {
+      method: 'get',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(targetUrl, options);
+    console.log(`Keep-Alive Heartbeat: ${response.getResponseCode()}`);
+    
+  } catch (e) {
+    console.error("Keep-Alive Error: " + e.toString());
   }
 }

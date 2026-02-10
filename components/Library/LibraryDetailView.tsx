@@ -1118,7 +1118,7 @@ const LibraryDetailView: React.FC<LibraryDetailViewProps> = ({ item, onClose, is
                 </div>
 
                 <div className="bg-[#004A74] p-8 rounded-[3rem] text-white space-y-6 flex flex-col">
-                  <h3 className="text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><VideoCameraIcon className="w-4 h-4" /> Visual Insights</h3>
+                  <h3 className="text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><VideoCameraIcon className="w-4 h-4" /> Video RecommendationInsights</h3>
                   <div className="flex-1 flex flex-col justify-center">
                     {currentItem.youtubeId || supportingData.videoUrl ? (
                       <div className="aspect-video rounded-[2rem] overflow-hidden bg-black shadow-2xl border-4 border-white/10">

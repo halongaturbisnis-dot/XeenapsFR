@@ -1,7 +1,7 @@
 
 /**
- * XEENAPS PKM - GLOBAL LITERATURE SEARCH PROXY (OPENALEX, CROSSREF & CORE EDITION)
- * Memproses pencarian ke OpenAlex, Crossref, dan CORE (bypass CORS) serta terjemahan via Lingva.
+ * XEENAPS PKM - GLOBAL LITERATURE SEARCH PROXY (SEMANTIC SCHOLAR, OPENALEX, CROSSREF & CORE EDITION)
+ * Memproses pencarian ke berbagai sumber akademik dengan prioritas kualitas data.
  */
 
 function handleGlobalArticleSearch(params) {
@@ -38,8 +38,7 @@ function handleGlobalArticleSearch(params) {
   };
 
   // B. CROSSREF REQUEST
-  // Crossref uses 'query.bibliographic' for general search and 'filter' for dates
-  let crossrefUrl = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(searchTerms)}&rows=${limit}&sort=score&select=DOI,title,author,published-print,published-online,container-title,abstract,is-referenced-by-count,URL`;
+  let crossrefUrl = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(searchTerms)}&rows=${limit}&sort=relevance&select=DOI,title,subtitle,original-title,author,published-print,published-online,container-title,abstract,is-referenced-by-count,URL`;
   
   if (yearStart) {
     let dateFilter = `from-pub-date:${yearStart}-01-01`;
@@ -54,7 +53,7 @@ function handleGlobalArticleSearch(params) {
     muteHttpExceptions: true
   };
 
-  // C. CORE API REQUEST (NEW)
+  // C. CORE API REQUEST
   const coreKey = getCoreApiKey();
   let reqCore = null;
   
@@ -76,9 +75,21 @@ function handleGlobalArticleSearch(params) {
     };
   }
 
+  // D. SEMANTIC SCHOLAR REQUEST (NEW - HIGH QUALITY SOURCE)
+  // Fields: paperId, title, authors, year, venue, externalIds (DOI), citationCount, abstract, openAccessPdf
+  let s2Url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(searchTerms)}&limit=${limit}&fields=paperId,title,authors,year,venue,externalIds,citationCount,abstract,openAccessPdf`;
+  if (yearStart || yearEnd) {
+    s2Url += `&year=${yearStart || ''}-${yearEnd || ''}`;
+  }
+  
+  const reqSemantic = {
+    url: s2Url,
+    muteHttpExceptions: true
+  };
+
   try {
-    // 3. PARALLEL FETCHING
-    const requests = [reqOpenAlex, reqCrossref];
+    // 3. PARALLEL FETCHING (S2 + OA + CR + Core)
+    const requests = [reqOpenAlex, reqCrossref, reqSemantic];
     if (reqCore) requests.push(reqCore);
 
     const responses = UrlFetchApp.fetchAll(requests);
@@ -86,18 +97,20 @@ function handleGlobalArticleSearch(params) {
     // --- PROCESS OPENALEX RESULTS ---
     let oaResults = [];
     if (responses[0].getResponseCode() === 200) {
-      const resultOA = JSON.parse(responses[0].getContentText());
-      oaResults = (resultOA.results || []).map(item => ({
-        paperId: item.id,
-        title: item.display_name || "Untitled",
-        authors: (item.authorships || []).map(a => ({ name: a.author.display_name })),
-        year: item.publication_year || null,
-        doi: item.doi ? item.doi.replace('https://doi.org/', '') : "",
-        url: item.doi || item.ids?.openalex || "",
-        venue: item.primary_location?.source?.display_name || "Academic Source",
-        citationCount: item.cited_by_count || 0,
-        abstract: "" 
-      }));
+      try {
+        const resultOA = JSON.parse(responses[0].getContentText());
+        oaResults = (resultOA.results || []).map(item => ({
+          paperId: item.id,
+          title: item.display_name || "Untitled",
+          authors: (item.authorships || []).map(a => ({ name: a.author.display_name })),
+          year: item.publication_year || null,
+          doi: item.doi ? item.doi.replace('https://doi.org/', '') : "",
+          url: item.doi || item.ids?.openalex || "",
+          venue: item.primary_location?.source?.display_name || "Academic Source",
+          citationCount: item.cited_by_count || 0,
+          abstract: "" 
+        }));
+      } catch (e) { console.log("OA parse error: " + e.toString()); }
     }
 
     // --- PROCESS CROSSREF RESULTS ---
@@ -113,12 +126,25 @@ function handleGlobalArticleSearch(params) {
       }
     }
 
-    // --- PROCESS CORE RESULTS (NEW) ---
-    let coreResults = [];
-    // CORE response is at index 2 if reqCore exists
-    if (reqCore && responses[2] && responses[2].getResponseCode() === 200) {
+    // --- PROCESS SEMANTIC SCHOLAR RESULTS (NEW) ---
+    let s2Results = [];
+    if (responses[2].getResponseCode() === 200) {
       try {
-        const resultCore = JSON.parse(responses[2].getContentText());
+        const resultS2 = JSON.parse(responses[2].getContentText());
+        if (resultS2.data) {
+          s2Results = resultS2.data.map(mapSemanticScholarData);
+        }
+      } catch (e) {
+        console.log("S2 parse error: " + e.toString());
+      }
+    }
+
+    // --- PROCESS CORE RESULTS ---
+    let coreResults = [];
+    // CORE response is at index 3 if reqCore exists
+    if (reqCore && responses[3] && responses[3].getResponseCode() === 200) {
+      try {
+        const resultCore = JSON.parse(responses[3].getContentText());
         if (resultCore.results) {
           coreResults = resultCore.results.map(mapCoreData);
         }
@@ -127,43 +153,38 @@ function handleGlobalArticleSearch(params) {
       }
     }
 
-    // 4. SMART AGGREGATION & DEDUPLICATION
-    // Priority: OpenAlex (Base) -> CORE (Inject PDF/Add Unique) -> Crossref (Add Unique)
-    
-    const finalResults = [...oaResults];
-    const existingDois = new Map(); // Map DOI to Item object for updates
-    
-    // Initialize map with OpenAlex items
-    oaResults.forEach(item => {
-      if (item.doi) existingDois.set(item.doi.toLowerCase(), item);
-    });
+    // 4. SMART AGGREGATION & STRICT FILTERING
+    // Priority: Semantic Scholar > OpenAlex > CORE > Crossref
+    // Logic: Use Map to deduplicate by DOI. If DOI missing, allow it but filtered aggressively.
 
-    // Merge CORE: Add unique or inject PDF link to existing
-    coreResults.forEach(item => {
-      if (item.doi && existingDois.has(item.doi.toLowerCase())) {
-        // Item exists in OpenAlex. Check if CORE has a PDF link to offer.
-        const existingItem = existingDois.get(item.doi.toLowerCase());
-        // If CORE has a specific download URL (often PDF), upgrade the URL
-        if (item.url && item.url.indexOf('core.ac.uk/download') > -1) {
-           existingItem.url = item.url; 
-        }
-      } else {
-        // Unique item from CORE
-        finalResults.push(item);
-        if (item.doi) existingDois.set(item.doi.toLowerCase(), item);
-      }
-    });
+    const finalResults = [];
+    const seenDois = new Set();
+    const seenTitles = new Set(); // Normalized title check
 
-    // Merge Crossref: Add only unique
-    crResults.forEach(item => {
-      if (item.doi && !existingDois.has(item.doi.toLowerCase())) {
-        finalResults.push(item);
-        existingDois.set(item.doi.toLowerCase(), item);
-      } else if (!item.doi) {
-        // Items without DOI (rare/fallback)
-        finalResults.push(item);
-      }
-    });
+    const addToResults = (item, sourceName) => {
+      // STRICT FILTER: Validate Title & Authors
+      if (!isValidItem(item)) return;
+
+      const normDOI = item.doi ? item.doi.toLowerCase().trim() : null;
+      const normTitle = item.title.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
+
+      // Check Duplicates
+      if (normDOI && seenDois.has(normDOI)) return;
+      if (!normDOI && seenTitles.has(normTitle)) return; // Avoid same title if no DOI
+
+      // Add to list
+      finalResults.push(item);
+      
+      // Mark as seen
+      if (normDOI) seenDois.add(normDOI);
+      if (normTitle) seenTitles.add(normTitle);
+    };
+
+    // Sequence by Quality Priority
+    s2Results.forEach(i => addToResults(i, 'S2'));
+    oaResults.forEach(i => addToResults(i, 'OA'));
+    coreResults.forEach(i => addToResults(i, 'CORE'));
+    crResults.forEach(i => addToResults(i, 'CR'));
 
     return { 
       status: 'success', 
@@ -176,8 +197,47 @@ function handleGlobalArticleSearch(params) {
 }
 
 /**
+ * STRICT FILTERING HELPER
+ * Menolak item jika judul kosong, terlalu pendek, atau berisi kata kunci administratif (sampah).
+ */
+function isValidItem(item) {
+  if (!item.title) return false;
+  
+  const title = item.title.trim();
+  if (title.length < 5) return false;
+  if (title.toLowerCase() === 'untitled') return false;
+
+  // Filter kata kunci administratif yang sering muncul di Crossref
+  const garbagePhrases = [
+    /^front matter/i,
+    /^back matter/i,
+    /^volume\s?\d+/i,
+    /^issue\s?information/i,
+    /^table of contents/i,
+    /^editorial board/i,
+    /^masthead/i,
+    /^author index/i,
+    /^subject index/i,
+    /^books received/i,
+    /^erratum/i,
+    /^corrigendum/i
+  ];
+
+  if (garbagePhrases.some(regex => regex.test(title))) return false;
+
+  // Filter jika tidak ada author sama sekali (optional, tapi meningkatkan kualitas)
+  // Kita beri toleransi jika sumbernya S2 atau OA karena kadang data author incomplete tapi paper valid
+  // Untuk Crossref, strict check author.
+  if ((!item.authors || item.authors.length === 0) && item.paperId.startsWith('cr_')) {
+      // Cek apakah judul sangat generik
+      if (title.split(' ').length < 3) return false; 
+  }
+
+  return true;
+}
+
+/**
  * NEW: handleGlobalBookSearch - Multi-Source Aggregator
- * Sources: Open Library, Google Books, Gutendex (Project Gutenberg)
  */
 function handleGlobalBookSearch(params) {
   const query = params.query || "";
@@ -185,7 +245,6 @@ function handleGlobalBookSearch(params) {
   const yearEnd = params.yearEnd;
   let limit = params.limit || 12;
 
-  // Clean ISBN input if applicable
   const cleanQuery = query.replace(/[-\s]/g, "");
   const isISBN = /^(97(8|9))?\d{9}(\d|X)$/i.test(cleanQuery);
 
@@ -196,11 +255,7 @@ function handleGlobalBookSearch(params) {
   if (isISBN) {
     olUrl = `https://openlibrary.org/search.json?isbn=${cleanQuery}&limit=${limit}`;
   } else {
-    // FIX V2: Disable translation for Book Search entirely.
-    // Searching for names like "Mora Claramita" causes translation engines to output garbage (e.g. "Delay Claramita")
-    // which breaks the search. Raw query is safest for books (Authors/Titles).
     const searchTerms = query.trim();
-    
     olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(searchTerms)}&limit=${limit}`;
     if (yearStart && yearEnd) {
       olUrl += `&first_publish_year:[${yearStart}+TO+${yearEnd}]`;
@@ -209,19 +264,16 @@ function handleGlobalBookSearch(params) {
   requests.push({ url: olUrl, muteHttpExceptions: true, type: 'OL' });
 
   // --- SOURCE 2: GOOGLE BOOKS ---
-  // Note: Google Books public API doesn't require key for basic search but has lower rate limits.
   let gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${isISBN ? 'isbn:' + cleanQuery : encodeURIComponent(query)}&maxResults=${limit}&printType=books`;
   requests.push({ url: gbUrl, muteHttpExceptions: true, type: 'GB' });
 
-  // --- SOURCE 3: GUTENDEX (PROJECT GUTENBERG) ---
-  // Note: Gutendex is great for classics, no strict year filter via API param easily.
-  if (!isISBN) { // Gutendex is primarily text search
+  // --- SOURCE 3: GUTENDEX ---
+  if (!isISBN) {
     let gutUrl = `https://gutendex.com/books?search=${encodeURIComponent(query)}`;
     requests.push({ url: gutUrl, muteHttpExceptions: true, type: 'GD' });
   }
 
   try {
-    // PARALLEL FETCHING
     const responses = UrlFetchApp.fetchAll(requests);
     let combinedResults = [];
 
@@ -249,35 +301,30 @@ function handleGlobalBookSearch(params) {
       try {
         const gbData = JSON.parse(responses[1].getContentText());
         const gbMapped = (gbData.items || []).map(item => mapGoogleBooksData(item));
-        
-        // Manual Year Filter for Google Books
         const gbFiltered = gbMapped.filter(b => {
           if (!yearStart && !yearEnd) return true;
           const y = parseInt(b.year);
           if (!y) return true;
           return (!yearStart || y >= parseInt(yearStart)) && (!yearEnd || y <= parseInt(yearEnd));
         });
-        
         combinedResults = combinedResults.concat(gbFiltered);
       } catch (e) {}
     }
 
-    // PROCESS: GUTENDEX (Only if requested)
+    // PROCESS: GUTENDEX
     if (!isISBN && responses[2] && responses[2].getResponseCode() === 200) {
       try {
         const gdData = JSON.parse(responses[2].getContentText());
-        // Gutendex results usually don't have year metadata suitable for filter, usually old classics.
         const gdMapped = (gdData.results || []).slice(0, limit).map(item => mapGutendexData(item));
         combinedResults = combinedResults.concat(gdMapped);
       } catch (e) {}
     }
 
-    // DEDUPLICATION (Simple check by Title similarity to avoid identical duplicates)
     const uniqueResults = [];
     const titlesSeen = new Set();
     
     for (const item of combinedResults) {
-      const normTitle = item.title.toLowerCase().trim().substring(0, 30); // Check first 30 chars
+      const normTitle = item.title.toLowerCase().trim().substring(0, 30);
       if (!titlesSeen.has(normTitle)) {
         uniqueResults.push(item);
         titlesSeen.add(normTitle);
@@ -295,7 +342,6 @@ function handleGlobalBookSearch(params) {
 
 function getCoreApiKey() {
   try {
-    // Config global ada di file Config.gs
     const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEETS.KEYS);
     const sheet = ss.getSheetByName("Core");
     if (!sheet) return null;
@@ -305,6 +351,33 @@ function getCoreApiKey() {
   }
 }
 
+// MAPPER: Semantic Scholar (Kualitas Tinggi)
+function mapSemanticScholarData(item) {
+  const title = item.title || "Untitled";
+  const authors = (item.authors || []).map(a => ({ name: a.name }));
+  const year = item.year || null;
+  const doi = item.externalIds ? item.externalIds.DOI : "";
+  const venue = item.venue || "Semantic Scholar";
+  const abstract = item.abstract || "";
+  
+  // Prioritize OpenAccess PDF, then DOI link, then S2 link
+  let url = item.openAccessPdf ? item.openAccessPdf.url : null;
+  if (!url && doi) url = `https://doi.org/${doi}`;
+  if (!url) url = `https://www.semanticscholar.org/paper/${item.paperId}`;
+
+  return {
+    paperId: `s2_${item.paperId}`,
+    title: title,
+    authors: authors,
+    year: year,
+    doi: doi || "",
+    url: url,
+    venue: venue,
+    citationCount: item.citationCount || 0,
+    abstract: abstract
+  };
+}
+
 function mapCoreData(item) {
   const title = item.title || "Untitled";
   const authors = (item.authors || []).map(a => ({ name: a.name }));
@@ -312,10 +385,8 @@ function mapCoreData(item) {
   const doi = item.doi || "";
   const abstract = item.abstract || "";
   
-  // Prefer downloadUrl (PDF) or generic link
   const url = item.downloadUrl || (item.links && item.links.length > 0 ? item.links[0] : "") || (doi ? `https://doi.org/${doi}` : "");
   
-  // Try to find journal name from various fields
   let venue = "CORE Repository";
   if (item.journals && item.journals.length > 0) venue = item.journals[0].title || venue;
   else if (item.publisher) venue = item.publisher;
@@ -328,23 +399,30 @@ function mapCoreData(item) {
     doi: doi,
     url: url,
     venue: venue,
-    citationCount: 0, // CORE search API standard response might not include citation count directly in list view
+    citationCount: 0,
     abstract: abstract,
-    // Helper property for deduplication logic (not part of final LiteratureArticle interface)
     pdfUrl: item.downloadUrl
   };
 }
 
 function mapCrossrefData(item) {
-  // Title: Crossref returns array
-  const title = (item.title && item.title.length > 0) ? item.title[0] : "Untitled";
+  // IMPROVED: Title Fallback Logic
+  // Cek title[0], lalu subtitle[0], lalu original-title[0]
+  let title = "Untitled";
+  if (item.title && item.title.length > 0 && item.title[0]) {
+    title = item.title[0];
+  } else if (item.subtitle && item.subtitle.length > 0 && item.subtitle[0]) {
+    title = item.subtitle[0];
+  } else if (item['original-title'] && item['original-title'].length > 0 && item['original-title'][0]) {
+    title = item['original-title'][0];
+  }
   
-  // Authors: Crossref format { given: "...", family: "..." }
+  // Authors
   const authors = (item.author || []).map(a => ({
     name: (a.given ? a.given + " " : "") + (a.family || "")
   }));
 
-  // Year: Check published-print or published-online
+  // Year
   let year = null;
   if (item['published-print'] && item['published-print']['date-parts']) {
     year = item['published-print']['date-parts'][0][0];
@@ -352,7 +430,7 @@ function mapCrossrefData(item) {
     year = item['published-online']['date-parts'][0][0];
   }
 
-  // Abstract: Clean XML tags if present
+  // Abstract Clean
   let abstract = item.abstract || "";
   if (abstract) {
     abstract = abstract.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
@@ -400,8 +478,8 @@ function mapGutendexData(item) {
   return {
     paperId: `gutendex_${item.id}`,
     title: item.title || "Classic Literature",
-    authors: (item.authors || []).map(a => ({ name: a.name.replace(/,/, '') })), // Gutendex names are "Last, First"
-    year: null, // Often purely public domain/classic
+    authors: (item.authors || []).map(a => ({ name: a.name.replace(/,/, '') })),
+    year: null,
     isbn: "",
     url: url || `https://www.gutenberg.org/ebooks/${item.id}`,
     venue: "Project Gutenberg",
@@ -410,9 +488,6 @@ function mapGutendexData(item) {
   };
 }
 
-/**
- * Lingva Engine - Khusus untuk pencarian Query
- */
 function lingvaTranslateQuery(text) {
   if (!text) return "";
   

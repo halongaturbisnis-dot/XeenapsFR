@@ -454,7 +454,7 @@ const SharboxDetailView: React.FC<SharboxDetailViewProps> = ({ item, activeTab, 
              </div>
 
              <div className="bg-[#004A74] p-8 md:p-10 rounded-[3rem] text-white space-y-6 flex flex-col">
-                <h3 className="text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><VideoCameraIcon className="w-4 h-4" /> Visual Insights</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2"><VideoCameraIcon className="w-4 h-4" /> Video Recommendation</h3>
                 <div className="flex-1 flex flex-col justify-center">
                    {supportingData.videoUrl ? (
                      <div className="aspect-video rounded-[2rem] overflow-hidden bg-black shadow-2xl border-4 border-white/10">

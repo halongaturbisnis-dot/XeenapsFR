@@ -303,7 +303,7 @@ const LibraryEditForm: React.FC<LibraryEditFormProps> = ({ onComplete, items = [
               const item = items.find(i => i.id === id);
               navigate('/', { state: { openItem: item }, replace: true });
             }} disabled={isSubmitting} className="w-full md:px-10 py-5 bg-gray-100 text-gray-400 rounded-[1.5rem] font-black text-sm uppercase">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-[#004A74] text-white rounded-[1.5rem] font-black text-sm flex items-center justify-center gap-3 uppercase">{isSubmitting ? 'UPDATING DATA...' : <><CheckIcon className="w-5 h-5" /> Save Changes</>}</button>
+            <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-[#004A74] text-white rounded-[1.5rem] font-black text-sm flex items-center justify-center gap-3 uppercase">{isSubmitting ? 'UPDATING DATA...' : <>Save Changes</>}</button>
           </div>
         </form>
       </FormContentArea>
