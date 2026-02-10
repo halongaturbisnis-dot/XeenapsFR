@@ -131,62 +131,66 @@ const NoteForm: React.FC<NoteFormProps> = ({ note, collectionId, onClose, onComp
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []) as File[];
+    if (files.length === 0) return;
 
-    const tempId = crypto.randomUUID();
-    let previewUrl: string | undefined;
+    setPendingUploadsCount(prev => prev + files.length);
 
-    if (file.type.startsWith('image/')) {
-      previewUrl = URL.createObjectURL(file);
-    }
+    for (const file of files) {
+      const tempId = crypto.randomUUID();
+      let previewUrl: string | undefined;
 
-    // INSTANT UI FEEDBACK (OPTIMISTIC)
-    const placeholder: NoteAttachment = {
-      type: 'FILE',
-      label: file.name, // Initial value automatically matches filename
-      url: previewUrl, 
-      fileId: `pending_${tempId}`,
-      mimeType: file.type
-    };
-
-    setContent(prev => ({ ...prev, attachments: [...prev.attachments, placeholder] }));
-    setPendingUploadsCount(prev => prev + 1);
-
-    // START PARALLEL SYNC
-    const uploadPromise = uploadNoteAttachment(file).then(result => {
-      if (result) {
-        newlyUploadedFiles.current.push({ fileId: result.fileId, nodeUrl: result.nodeUrl });
-        
-        // Smart URL mapping based on file type
-        const finalUrl = result.mimeType.startsWith('image/') 
-          ? `https://lh3.googleusercontent.com/d/${result.fileId}`
-          : `https://drive.google.com/file/d/${result.fileId}/view`;
-
-        // Update the item once finished
-        setContent(prev => ({
-          ...prev,
-          attachments: prev.attachments.map(at => 
-            at.fileId === `pending_${tempId}` 
-              ? { ...at, fileId: result.fileId, nodeUrl: result.nodeUrl, url: finalUrl } 
-              : at
-          )
-        }));
-      } else {
-        // Silent rollback on error
-        setContent(prev => ({
-          ...prev,
-          attachments: prev.attachments.filter(at => at.fileId !== `pending_${tempId}`)
-        }));
+      if (file.type.startsWith('image/')) {
+        previewUrl = URL.createObjectURL(file);
       }
-      setPendingUploadsCount(prev => Math.max(0, prev - 1));
-      uploadPromises.current.delete(tempId);
-    }).catch(() => {
-      setPendingUploadsCount(prev => Math.max(0, prev - 1));
-      uploadPromises.current.delete(tempId);
-    });
 
-    uploadPromises.current.set(tempId, uploadPromise);
+      // INSTANT UI FEEDBACK (OPTIMISTIC)
+      const placeholder: NoteAttachment = {
+        type: 'FILE',
+        label: file.name, // Initial value automatically matches filename
+        url: previewUrl, 
+        fileId: `pending_${tempId}`,
+        mimeType: file.type
+      };
+
+      setContent(prev => ({ ...prev, attachments: [...prev.attachments, placeholder] }));
+
+      // START PARALLEL SYNC
+      const uploadPromise = uploadNoteAttachment(file).then(result => {
+        if (result) {
+          newlyUploadedFiles.current.push({ fileId: result.fileId, nodeUrl: result.nodeUrl });
+          
+          // Smart URL mapping based on file type
+          const finalUrl = result.mimeType.startsWith('image/') 
+            ? `https://lh3.googleusercontent.com/d/${result.fileId}`
+            : `https://drive.google.com/file/d/${result.fileId}/view`;
+
+          // Update the item once finished
+          setContent(prev => ({
+            ...prev,
+            attachments: prev.attachments.map(at => 
+              at.fileId === `pending_${tempId}` 
+                ? { ...at, fileId: result.fileId, nodeUrl: result.nodeUrl, url: finalUrl } 
+                : at
+            )
+          }));
+        } else {
+          // Silent rollback on error
+          setContent(prev => ({
+            ...prev,
+            attachments: prev.attachments.filter(at => at.fileId !== `pending_${tempId}`)
+          }));
+        }
+        setPendingUploadsCount(prev => Math.max(0, prev - 1));
+        uploadPromises.current.delete(tempId);
+      }).catch(() => {
+        setPendingUploadsCount(prev => Math.max(0, prev - 1));
+        uploadPromises.current.delete(tempId);
+      });
+
+      uploadPromises.current.set(tempId, uploadPromise);
+    }
+    
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -271,7 +275,7 @@ const NoteForm: React.FC<NoteFormProps> = ({ note, collectionId, onClose, onComp
                     <button type="button" onClick={handleAddLink} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-[#004A74] hover:bg-gray-50 shadow-sm transition-all"><LinkIcon size={12} /> Add Link</button>
                     <label className="flex items-center gap-1.5 px-4 py-2 bg-[#004A74] text-white rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer hover:bg-[#003859] shadow-md transition-all">
                        <Plus size={12} /> Attach File
-                       <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
+                       <input type="file" ref={fileInputRef} className="hidden" multiple onChange={handleFileSelect} />
                     </label>
                  </div>
               </div>
