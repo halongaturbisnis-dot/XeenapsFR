@@ -18,11 +18,14 @@ import {
   Eye, 
   ArrowUpCircle, 
   ArrowDownCircle,
-  PlusCircle
+  PlusCircle,
+  Link as LinkIcon
 } from 'lucide-react';
 import { FormField } from '../../../Common/FormComponents';
 import { showXeenapsDeleteConfirm } from '../../../../utils/confirmUtils';
 import { showXeenapsToast } from '../../../../utils/toastUtils';
+import Swal from 'sweetalert2';
+import { XEENAPS_SWAL_CONFIG } from '../../../../utils/swalUtils';
 
 interface FinanceFormModalProps {
   projectId: string;
@@ -92,6 +95,35 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
   };
 
   const formattedAmount = new Intl.NumberFormat('id-ID').format(parseInt(amountStr) || 0);
+
+  const handleAddLink = async () => {
+    const { value: formValues } = await Swal.fire({
+      title: 'ADD LINK EVIDENCE',
+      html:
+        '<input id="swal-input1" class="swal2-input" placeholder="Label (e.g. Invoice URL)">' +
+        '<input id="swal-input2" class="swal2-input" placeholder="https://...">',
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'ADD',
+      cancelButtonText: 'CANCEL',
+      ...XEENAPS_SWAL_CONFIG,
+      preConfirm: () => {
+        return [
+          (document.getElementById('swal-input1') as HTMLInputElement).value,
+          (document.getElementById('swal-input2') as HTMLInputElement).value
+        ]
+      }
+    });
+  
+    if (formValues && formValues[0] && formValues[1]) {
+      const newLink: TracerFinanceAttachment = {
+        type: 'LINK',
+        label: formValues[0],
+        url: formValues[1]
+      };
+      setContent(prev => ({ attachments: [...prev.attachments, newLink] }));
+    }
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []) as File[];
@@ -262,7 +294,10 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
               <div className="flex items-center justify-between px-2">
                  <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">Supporting Evidence</h4>
                  {!isViewOnly && (
-                   <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-[#004A74] rounded-xl text-[9px] font-black uppercase border border-gray-200 hover:bg-white shadow-sm transition-all"><Plus size={14} /> Attach File</button>
+                   <div className="flex gap-2">
+                      <button type="button" onClick={handleAddLink} className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-[#004A74] rounded-xl text-[9px] font-black uppercase border border-gray-200 hover:bg-white shadow-sm transition-all"><LinkIcon size={14} /> Add Link</button>
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-[#004A74] text-white rounded-xl text-[9px] font-black uppercase border border-[#004A74] hover:bg-[#003859] shadow-sm transition-all"><Plus size={14} /> Attach Files</button>
+                   </div>
                  )}
               </div>
 
@@ -315,7 +350,7 @@ const FinanceFormModal: React.FC<FinanceFormModalProps> = ({ projectId, item, cu
              </div>
            )}
 
-           <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+           <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" multiple />
         </form>
       </div>
     </div>,

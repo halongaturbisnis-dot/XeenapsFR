@@ -118,10 +118,10 @@ const QuoteNowModal: React.FC<QuoteNowModalProps> = ({ item, onClose, onSave }) 
         
         <div className="px-8 py-8 border-b border-gray-100 flex items-center justify-between shrink-0 bg-gray-50/50">
            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#004A74] text-[#FED400] rounded-2xl flex items-center justify-center shadow-lg"><Zap size={24} /></div>
+              <div className="w-12 h-12 bg-[#004A74] text-[#FED400] rounded-2xl flex items-center justify-center shadow-lg"><Quote size={24} /></div>
               <div>
-                 <h3 className="text-xl font-black text-[#004A74] uppercase tracking-tight">AI Quote Discoverer</h3>
-                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Contextual Evidence Extraction Engine</p>
+                 <h3 className="text-xl font-black text-[#004A74] uppercase tracking-tight">Quote Discoverer</h3>
+                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Contextual Evidence Extraction</p>
               </div>
            </div>
            <button onClick={onClose} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all"><X size={28} /></button>
@@ -132,7 +132,7 @@ const QuoteNowModal: React.FC<QuoteNowModalProps> = ({ item, onClose, onSave }) 
              <div className="space-y-10 animate-in zoom-in-95">
                 <div className="text-center space-y-4">
                    <h2 className="text-2xl font-black text-[#004A74] uppercase tracking-tight">Define Your Search Context</h2>
-                   <p className="text-xs font-medium text-gray-500 max-w-md mx-auto leading-relaxed">Describe the logic or findings you are looking for. AI will locate 3 distinct quotes and architect academic enhancements for each.</p>
+                   <p className="text-xs font-medium text-gray-500 max-w-md mx-auto leading-relaxed">Describe the context you are looking for. AI will locate 3 distinct quotes and architect academic enhancements for each.</p>
                 </div>
                 <div className="relative group">
                    <MessageSquare className="absolute left-6 top-8 w-6 h-6 text-gray-200 group-focus-within:text-[#FED400] transition-colors" />
@@ -152,8 +152,8 @@ const QuoteNowModal: React.FC<QuoteNowModalProps> = ({ item, onClose, onSave }) 
                    <Search className="w-10 h-10 absolute inset-0 m-auto text-[#004A74] animate-pulse" />
                 </div>
                 <div className="space-y-2">
-                   <h3 className="text-2xl font-black text-[#004A74] uppercase tracking-tighter">Deep Scanning Doc Nodes</h3>
-                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">AI is identifying and enhancing top 3 contextual verbatim matches...</p>
+                   <h3 className="text-2xl font-black text-[#004A74] uppercase tracking-tighter">Scanning Source</h3>
+                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Identifying and enhancing top 3 contextual verbatim matches...</p>
                 </div>
              </div>
            )}
@@ -161,7 +161,7 @@ const QuoteNowModal: React.FC<QuoteNowModalProps> = ({ item, onClose, onSave }) 
            {stage === 'result' && (
              <div className="space-y-12 animate-in slide-in-from-bottom-4 duration-700">
                 <div className="flex items-center justify-between px-2">
-                   <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">Discovery Results (Ranked)</h4>
+                   <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">Discovery Results</h4>
                    <p className="text-[9px] font-black text-[#004A74] uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">{results.filter(r=>r.isSelected).length} Items Selected</p>
                 </div>
 
@@ -176,7 +176,7 @@ const QuoteNowModal: React.FC<QuoteNowModalProps> = ({ item, onClose, onSave }) 
                         <div className="flex items-start justify-between gap-6 mb-6">
                            <div className="flex-1 space-y-4">
                               <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-[#004A74]">
-                                 <Sparkles size={12} className="text-[#FED400] fill-[#FED400]" /> Intelligence Option 0{idx+1}
+                                 <Sparkles size={12} className="text-[#FED400] fill-[#FED400]" /> Option 0{idx+1}
                               </div>
                               <p className="text-sm md:text-base font-medium text-[#004A74] leading-relaxed italic">"{res.enhancedText}"</p>
                            </div>
@@ -227,7 +227,7 @@ const QuoteNowModal: React.FC<QuoteNowModalProps> = ({ item, onClose, onSave }) 
                      disabled={isBusy || results.filter(r=>r.isSelected).length === 0}
                      className="flex-[2] py-5 bg-[#004A74] text-[#FED400] rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl flex items-center justify-center gap-3 disabled:opacity-50"
                    >
-                     {isBusy ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Anchor Intelligence Node(s)
+                     {isBusy ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} Save selected quote(s)
                    </button>
                 </div>
              </div>
