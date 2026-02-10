@@ -1,3 +1,4 @@
+
 import { LibraryItem, GASResponse, ExtractionResult } from '../types';
 import { GAS_WEB_APP_URL } from '../constants';
 import Swal from 'sweetalert2';
@@ -185,7 +186,36 @@ export const saveExtractedContentToDrive = async (
 ): Promise<{ status: string, fileId: string, nodeUrl: string } | null> => {
   try {
     if (!GAS_WEB_APP_URL) return null;
-    // Re-use 'saveItem' logic but with text content specifically
+
+    // 1. UPDATE MODE: If ID exists, overwrite the existing file
+    if (item.extractedJsonId) {
+      const targetUrl = item.storageNodeUrl || GAS_WEB_APP_URL;
+      const jsonContent = JSON.stringify({ id: item.id, fullText: content });
+      
+      const payload = {
+        action: 'saveJsonFile',
+        fileId: item.extractedJsonId,
+        fileName: `extracted_${item.id}.json`,
+        content: jsonContent
+      };
+
+      const response = await fetch(targetUrl, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+        return { 
+           status: 'success', 
+           fileId: item.extractedJsonId, 
+           nodeUrl: targetUrl 
+        };
+      }
+      return null;
+    }
+
+    // 2. CREATE MODE: Register new file (Let GAS handle storage balancing)
     const payload = {
       action: 'saveItem',
       item: item,
@@ -197,7 +227,17 @@ export const saveExtractedContentToDrive = async (
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    return await response.json();
+    
+    const result = await response.json();
+    if (result.status === 'success') {
+       // IMPORTANT: Map extractedJsonId to fileId for modal compatibility
+       return {
+         status: 'success',
+         fileId: result.extractedJsonId,
+         nodeUrl: result.nodeUrl
+       };
+    }
+    return result;
   } catch (e) {
     return null;
   }
