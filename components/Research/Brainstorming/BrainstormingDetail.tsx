@@ -38,6 +38,7 @@ import { showXeenapsToast } from '../../../utils/toastUtils';
 import { showXeenapsDeleteConfirm } from '../../../utils/confirmUtils';
 import LibraryDetailView from '../../Library/LibraryDetailView';
 import { BRAND_ASSETS } from '../../../assets';
+import BrainstormingField from './BrainstormingField';
 
 const LANG_OPTIONS = [
   { label: "English", code: "en" },
@@ -301,6 +302,11 @@ const BrainstormingDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ librar
     );
   };
 
+  const updateField = (key: keyof BrainstormingItem, value: string) => {
+    if (!item) return;
+    setItem({ ...item, [key]: value.replace(/—/g, '-') });
+  };
+
   if (!item) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-white h-full">
@@ -421,115 +427,74 @@ const BrainstormingDetail: React.FC<{ libraryItems: LibraryItem[] }> = ({ librar
               </div>
            </div>
 
-           {/* b. Title full width editable */}
+           {/* b. Title full width editable - SWAPPED WITH BRAINSTORMINGFIELD */}
            <div className="space-y-3">
-              <label className="text-[9px] font-black uppercase tracking-widest text-[#004A74] flex items-center gap-2">
-                <Target size={14} /> Academic Title Proposal
-              </label>
-              <textarea 
-                className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xl font-black text-[#004A74] uppercase tracking-tighter transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none"
+              <BrainstormingField
+                label={<span className="flex items-center gap-2"><Target size={14} /> Academic Title Proposal</span>}
                 value={item.proposedTitle}
-                placeholder="Awaiting Synthesis..."
-                onChange={(e) => {
-                  setItem({ ...item, proposedTitle: e.target.value.replace(/—/g, '-') });
-                  adjustHeight(e.target);
-                }}
-                onFocus={(e) => adjustHeight(e.target)}
-                rows={1}
-                ref={(el) => adjustHeight(el)}
+                fieldKey="proposedTitle"
+                context={item}
+                onChange={(val) => updateField('proposedTitle', val)}
+                className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xl font-black text-[#004A74] uppercase tracking-tighter transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none overflow-hidden"
               />
            </div>
 
-           {/* MOVED: The White Space (Gap) - Now under Title */}
+           {/* MOVED: The White Space (Gap) - SWAPPED WITH BRAINSTORMINGFIELD (DARK MODE) */}
            <div className="space-y-3">
-             <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-               <Search size={14} /> The White Space (Gap)
-             </label>
-             <textarea 
-               className="w-full bg-[#004A74] p-6 border border-[#004A74]/10 rounded-3xl outline-none text-xs font-bold text-white leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none"
-               value={item.researchGap}
-               placeholder="Define the knowledge gap..."
-               onChange={(e) => {
-                 setItem({ ...item, researchGap: e.target.value.replace(/—/g, '-') });
-                 adjustHeight(e.target);
-               }}
-               onFocus={(e) => adjustHeight(e.target)}
-               rows={1}
-               ref={(el) => adjustHeight(el)}
-             />
+             <BrainstormingField
+                label={<span className="flex items-center gap-2"><Search size={14} /> The White Space (Gap)</span>}
+                value={item.researchGap}
+                fieldKey="researchGap"
+                context={item}
+                onChange={(val) => updateField('researchGap', val)}
+                isDark={true}
+                className="w-full bg-[#004A74] p-6 border border-[#004A74]/10 rounded-3xl outline-none text-xs font-bold text-white leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none overflow-hidden"
+              />
            </div>
 
-           {/* c, d, e, f, g: Logic Elements Stacked (Gap removed from here) */}
+           {/* c, d, e, f, g: Logic Elements Stacked (Gap removed from here) - SWAPPED WITH BRAINSTORMINGFIELD */}
            <div className="space-y-8">
               <div className="space-y-3">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                  <MessageSquare size={14} /> Problem Justification
-                </label>
-                <textarea 
-                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none"
+                <BrainstormingField
+                  label={<span className="flex items-center gap-2"><MessageSquare size={14} /> Problem Justification</span>}
                   value={item.problemStatement}
-                  placeholder="State the core problem..."
-                  onChange={(e) => {
-                    setItem({ ...item, problemStatement: e.target.value.replace(/—/g, '-') });
-                    adjustHeight(e.target);
-                  }}
-                  onFocus={(e) => adjustHeight(e.target)}
-                  rows={1}
-                  ref={(el) => adjustHeight(el)}
+                  fieldKey="problemStatement"
+                  context={item}
+                  onChange={(val) => updateField('problemStatement', val)}
+                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none overflow-hidden"
                 />
               </div>
 
               <div className="space-y-3">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                  <AlignLeft size={14} /> Investigation Question
-                </label>
-                <textarea 
-                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none"
+                <BrainstormingField
+                  label={<span className="flex items-center gap-2"><AlignLeft size={14} /> Investigation Question</span>}
                   value={item.researchQuestion}
-                  placeholder="What are we trying to answer?"
-                  onChange={(e) => {
-                    setItem({ ...item, researchQuestion: e.target.value.replace(/—/g, '-') });
-                    adjustHeight(e.target);
-                  }}
-                  onFocus={(e) => adjustHeight(e.target)}
-                  rows={1}
-                  ref={(el) => adjustHeight(el)}
+                  fieldKey="researchQuestion"
+                  context={item}
+                  onChange={(val) => updateField('researchQuestion', val)}
+                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none overflow-hidden"
                 />
               </div>
 
               <div className="space-y-3">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                  <FlaskConical size={14} /> Approach & Methodology
-                </label>
-                <textarea 
-                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none"
+                <BrainstormingField
+                  label={<span className="flex items-center gap-2"><FlaskConical size={14} /> Approach & Methodology</span>}
                   value={item.methodology}
-                  placeholder="Define the methodology..."
-                  onChange={(e) => {
-                    setItem({ ...item, methodology: e.target.value.replace(/—/g, '-') });
-                    adjustHeight(e.target);
-                  }}
-                  onFocus={(e) => adjustHeight(e.target)}
-                  rows={1}
-                  ref={(el) => adjustHeight(el)}
+                  fieldKey="methodology"
+                  context={item}
+                  onChange={(val) => updateField('methodology', val)}
+                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none overflow-hidden"
                 />
               </div>
 
               <div className="space-y-3">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                  <Users size={14} /> Targeted Population
-                </label>
-                <textarea 
-                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none"
+                <BrainstormingField
+                  label={<span className="flex items-center gap-2"><Users size={14} /> Targeted Population</span>}
                   value={item.population}
-                  placeholder="Define targeted population..."
-                  onChange={(e) => {
-                    setItem({ ...item, population: e.target.value.replace(/—/g, '-') });
-                    adjustHeight(e.target);
-                  }}
-                  onFocus={(e) => adjustHeight(e.target)}
-                  rows={1}
-                  ref={(el) => adjustHeight(el)}
+                  fieldKey="population"
+                  context={item}
+                  onChange={(val) => updateField('population', val)}
+                  className="w-full bg-white p-6 border border-gray-200 rounded-3xl outline-none text-xs font-bold text-gray-600 leading-relaxed transition-all focus:border-[#FED400] focus:ring-4 focus:ring-[#FED400]/5 resize-none overflow-hidden"
                 />
               </div>
            </div>

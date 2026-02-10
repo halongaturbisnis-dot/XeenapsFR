@@ -40,6 +40,52 @@ export const deleteBrainstorming = async (id: string): Promise<boolean> => {
 
 // --- AI FUNCTIONS (REMAIN ON GAS/AI PROXY) ---
 
+export const refineBrainstormingField = async (
+  fieldName: string,
+  currentValue: string,
+  context: BrainstormingItem,
+  mode: 'REWRITE' | 'EXPAND'
+): Promise<string | null> => {
+  // Sanitasi context agar tidak terlalu besar (hilangkan array besar yang tidak relevan)
+  const contextMini = {
+    title: context.proposedTitle,
+    problem: context.problemStatement,
+    gap: context.researchGap,
+    question: context.researchQuestion,
+    methodology: context.methodology,
+    population: context.population
+  };
+
+  const instruction = mode === 'REWRITE' 
+    ? `Please REWRITE the '${fieldName}' field. Make it more academic, concise, and scientifically aligned with the Research Question.` 
+    : `Please EXPAND the '${fieldName}' field. Add detail, depth, and rigorous academic nuance. CRITICAL: Ensure it is consistent with the Research Question and Problem Statement.`;
+
+  const prompt = `ACT AS A SENIOR RESEARCH CO-PILOT.
+  Based on the full project context below, perform the following action on the specific field.
+  
+  CONTEXT JSON:
+  ${JSON.stringify(contextMini)}
+
+  TARGET FIELD: "${fieldName}"
+  CURRENT VALUE: "${currentValue}"
+  ACTION: ${mode}
+
+  INSTRUCTION: ${instruction}
+
+  --- RULES ---
+  1. RETURN ONLY THE NEW TEXT STRING for the field. NO CONVERSATION. NO JSON.
+  2. STRICTLY DO NOT USE Markdown symbols like **, #, or -. Use standard text or HTML <b> if strictly necessary for emphasis.
+  3. LANGUAGE: English (Academic).`;
+
+  try {
+    const response = await callAiProxy('gemini', prompt);
+    return response ? response.trim() : null;
+  } catch (e) {
+    console.error("Refine field failed:", e);
+    return null;
+  }
+};
+
 export const synthesizeRoughIdea = async (roughIdea: string): Promise<Partial<BrainstormingItem> | null> => {
   const prompt = `ACT AS A SENIOR RESEARCH STRATEGIST.
   TRANSFORM THE FOLLOWING ROUGH IDEA INTO A STRUCTURED RESEARCH FRAMEWORK.
