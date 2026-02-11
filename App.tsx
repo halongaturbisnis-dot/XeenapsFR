@@ -2,13 +2,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 // @ts-ignore - Resolving TS error for missing exported members in some environments
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { LibraryItem, TeachingItem, ActivityItem, TracerProject, PublicationItem, BrainstormingItem } from './types';
+import { LibraryItem, TeachingItem, ActivityItem, TracerProject, PublicationItem, BrainstormingItem, VipAdItem } from './types';
 import { fetchLibraryFromSupabase } from './services/LibrarySupabaseService';
 import { fetchTeachingPaginated } from './services/TeachingService';
 import { fetchActivitiesPaginated } from './services/ActivityService';
 import { fetchTracerProjects } from './services/TracerService';
 import { fetchPublicationsPaginated } from './services/PublicationService';
 import { fetchBrainstormingPaginated } from './services/BrainstormingService';
+import { fetchVipAd } from './services/AdService';
 import LibraryMain from './components/Library/LibraryMain';
 import LibraryForm from './components/Library/LibraryForm';
 import LibraryEditForm from './components/Library/LibraryEditForm';
@@ -28,6 +29,7 @@ import AllReview from './components/Research/LiteratureReview/AllReview';
 import ReviewDetail from './components/Research/LiteratureReview/ReviewDetail';
 import DashboardMain from './components/Dashboard/DashboardMain';
 import ReloadPrompt from './components/Layout/ReloadPrompt';
+import VipAdModal from './components/Layout/VipAdModal';
 
 // Placeholder for the upcoming modules
 const ActivityMain = React.lazy(() => import('./components/Activities/ActivityMain'));
@@ -63,6 +65,10 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // VIP ADS STATE
+  const [vipAd, setVipAd] = useState<VipAdItem | null>(null);
+  const [showAd, setShowAd] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -100,6 +106,16 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    
+    // Fetch VIP Ad on Mount
+    const initAd = async () => {
+      const ad = await fetchVipAd();
+      if (ad) {
+        setVipAd(ad);
+        setShowAd(true);
+      }
+    };
+    initAd();
   }, [loadData]);
 
   // --- GLOBAL OPTIMISTIC SYNC LISTENERS ---
@@ -264,6 +280,10 @@ const App: React.FC = () => {
       <ScrollToTop />
       {/* Silent Updater for PWA Lifecycle */}
       <ReloadPrompt />
+      
+      {/* VIP ADS MODAL */}
+      {showAd && vipAd && <VipAdModal data={vipAd} onClose={() => setShowAd(false)} />}
+      
       <div className={`flex min-h-screen bg-white text-[#004A74] ${isLoading ? 'pointer-events-none select-none' : ''}`}>
         {isMobileSidebarOpen && (
           <div 

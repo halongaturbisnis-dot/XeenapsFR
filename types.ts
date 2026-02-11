@@ -843,6 +843,12 @@ export interface TutorialItem {
   link: string;
 }
 
+// --- VIP ADS TYPES ---
+export interface VipAdItem {
+  imageUrl: string;
+  ctaLink: string;
+}
+
 export interface GASResponse<T> {
   status: 'success' | 'error';
   data?: T;
