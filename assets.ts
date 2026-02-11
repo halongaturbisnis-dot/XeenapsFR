@@ -15,5 +15,5 @@ export const SPREADSHEET_CONFIG = {
   LITERATURE_ARCHIVE_ID: '1cJxS3gIYW3-WIgLs5L0mW6LKj4yAlh8kk0wJJ7nFmpE',
   COLLABORATION_CSV: 'https://docs.google.com/spreadsheets/d/1bVWpIB3dcpagfVE9PgzUAND6QEo34AFh_ADglCHv_sQ/export?format=csv&gid=0',
   // PENTING: Ganti 'gid=123456' dibawah dengan GID asli dari Sheet "VIP" Anda
-  VIP_ADS_CSV: 'https://docs.google.com/spreadsheets/d/1bVWpIB3dcpagfVE9PgzUAND6QEo34AFh_ADglCHv_sQ/export?format=csv&gid=123456'
+  VIP_ADS_CSV: 'https://docs.google.com/spreadsheets/d/1bVWpIB3dcpagfVE9PgzUAND6QEo34AFh_ADglCHv_sQ/export?format=csv&gid=708427383'
 };
