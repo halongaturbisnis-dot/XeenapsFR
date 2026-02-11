@@ -4,17 +4,26 @@ import { VipAdItem } from '../types';
 
 export const fetchVipAd = async (): Promise<VipAdItem | null> => {
   try {
+    console.log("🔍 [AdService] Fetching VIP Ads from:", SPREADSHEET_CONFIG.VIP_ADS_CSV);
+    
     const response = await fetch(SPREADSHEET_CONFIG.VIP_ADS_CSV);
+    
+    // 1. Cek apakah Response OK
     if (!response.ok) {
-      throw new Error('Failed to fetch ads');
+      console.error(`❌ [AdService] HTTP Error: ${response.status}`);
+      return null;
     }
+
     const csvText = await response.text();
-    
-    // Simple CSV parser for this specific structure
-    // Expected Columns: 
-    // 0: No, 1: Status, 2: Category, 3: CollaboratorName, 4: StartDate, 
-    // 5: Duration, 6: EndDate, 7: Image, 8: CTALink
-    
+
+    // 2. Cek apakah ini Halaman Login Google (HTML) bukan CSV
+    // Ini terjadi jika Spreadsheet belum di-set "Anyone with the link"
+    if (csvText.trim().startsWith("<!DOCTYPE html>") || csvText.includes("<html")) {
+      console.error("❌ [AdService] Error: URL mengembalikan HTML (Halaman Login), bukan CSV. Pastikan Spreadsheet di-share 'Anyone with the link' dan GID benar.");
+      return null;
+    }
+
+    // Simple CSV parser for quoted fields
     const parseRow = (row: string) => {
       const cols: string[] = [];
       let currentVal = '';
@@ -40,25 +49,53 @@ export const fetchVipAd = async (): Promise<VipAdItem | null> => {
     };
 
     const rows = csvText.split(/\r?\n/).filter(row => row.trim().length > 0);
-    // Skip Header (Row 0)
     
-    // Iterate BACKWARDS to find the latest ACTIVE ad
+    if (rows.length < 2) {
+      console.warn("⚠️ [AdService] CSV kosong atau hanya header.");
+      return null;
+    }
+
+    // 3. DYNAMIC HEADER MAPPING
+    // Cari index kolom berdasarkan nama header (Case Insensitive)
+    const headers = parseRow(rows[0]).map(h => h.toLowerCase());
+    console.log("ℹ️ [AdService] Detected Headers:", headers);
+
+    const statusIdx = headers.findIndex(h => h === 'status');
+    const imageIdx = headers.findIndex(h => h === 'image');
+    const linkIdx = headers.findIndex(h => h === 'ctalink' || h === 'cta link' || h === 'link');
+
+    if (statusIdx === -1 || imageIdx === -1) {
+      console.error("❌ [AdService] Kolom 'Status' atau 'Image' tidak ditemukan pada Header CSV.");
+      return null;
+    }
+
+    // 4. Reverse Search (Cari ACTIVE terbawah)
     for (let i = rows.length - 1; i >= 1; i--) {
       const cols = parseRow(rows[i]);
-      if (cols.length >= 9) {
-        const status = cols[1]?.toUpperCase();
+      
+      // Pastikan baris memiliki data di kolom yang dibutuhkan
+      if (cols[statusIdx]) {
+        const status = cols[statusIdx].toUpperCase();
+        
         if (status === 'ACTIVE') {
-          return {
-            imageUrl: cols[7],
-            ctaLink: cols[8]
-          };
+          const imageUrl = cols[imageIdx];
+          const ctaLink = linkIdx !== -1 ? cols[linkIdx] : '';
+
+          if (imageUrl) {
+            console.log(`✅ [AdService] Found Active Ad at Row ${i + 1}:`, { imageUrl, ctaLink });
+            return {
+              imageUrl: imageUrl,
+              ctaLink: ctaLink
+            };
+          }
         }
       }
     }
     
+    console.log("ℹ️ [AdService] Tidak ada iklan dengan status ACTIVE.");
     return null;
   } catch (error) {
-    console.error("Ad Service Error:", error);
+    console.error("❌ [AdService] Exception:", error);
     return null;
   }
 };
