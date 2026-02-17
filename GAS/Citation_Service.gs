@@ -67,8 +67,8 @@ function formatCitations(item, style, lang) {
       narrative = `${shortAuthor} (${year})`;
       bibliography = `${bibAuthorStr} (${year}). ${title}. `;
       if (journal) {
-        bibliography += `${journal}`;
-        if (vol) bibliography += `, ${vol}`;
+        bibliography += `<i>${journal}</i>`;
+        if (vol) bibliography += `, <i>${vol}</i>`;
         if (issue) bibliography += `(${issue})`;
         if (pages) bibliography += `, ${pages}`;
       } else if (publisher) {
@@ -87,7 +87,7 @@ function formatCitations(item, style, lang) {
       }).join(", ");
       bibliography = `${ieeeAuthors}, "${title}," `;
       if (journal) {
-        bibliography += `${journal}, ${l.vol} ${vol}, ${l.no} ${issue}, ${l.pp} ${pages}, ${year}.`;
+        bibliography += `<i>${journal}</i>, ${l.vol} ${vol}, ${l.no} ${issue}, ${l.pp} ${pages}, ${year}.`;
       } else {
         bibliography += `${publisher}, ${year}.`;
       }
@@ -98,12 +98,12 @@ function formatCitations(item, style, lang) {
       narrative = `${shortAuthor} (${year})`;
       bibliography = `${bibAuthorStr}. ${year}. "${title}." `;
       if (journal) {
-        bibliography += `${journal}`;
+        bibliography += `<i>${journal}</i>`;
         if (vol) bibliography += ` ${vol}`;
         if (issue) bibliography += `, ${l.no} ${issue}`;
         if (pages) bibliography += `: ${pages}`;
       } else if (publisher) {
-        bibliography += `${publisher}.`;
+        bibliography += `<i>${publisher}</i>.`;
       }
       if (source) bibliography += ` ${source}.`;
       break;
@@ -138,9 +138,9 @@ function formatCitations(item, style, lang) {
       narrative = `${shortAuthor}`;
       bibliography = `${mlaAuthorStr}. "${title}." `;
       if (journal) {
-        bibliography += `${journal}, ${l.vol} ${vol}, ${l.no} ${issue}, ${year}, ${l.pp} ${pages}.`;
+        bibliography += `<i>${journal}</i>, ${l.vol} ${vol}, ${l.no} ${issue}, ${year}, ${l.pp} ${pages}.`;
       } else {
-        bibliography += `${publisher}, ${year}.`;
+        bibliography += `<i>${publisher}</i>, ${year}.`;
       }
       if (source) bibliography += ` ${source.replace(/^https?:\/\//, '')}.`;
       break;
@@ -151,19 +151,19 @@ function formatCitations(item, style, lang) {
       narrative = `${shortAuthor} (${year})`;
       bibliography = `${bibAuthorStr} (${year}) '${title}'`;
       if (journal) {
-        bibliography += `, ${journal}`;
+        bibliography += `, <i>${journal}</i>`;
         if (vol) bibliography += `, ${vol}`;
         if (issue) bibliography += `(${issue})`;
         if (pages) bibliography += `, ${l.pp} ${pages}`;
       } else if (publisher) {
-        bibliography += `, ${publisher}`;
+        bibliography += `, <i>${publisher}</i>`;
       }
       if (source) bibliography += `. ${l.available}: ${source}`;
       break;
   }
 
-  // Final Cleanup: No HTML allowed, remove redundant spaces
-  bibliography = bibliography.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  // Final Cleanup: Keep HTML tags for bibliography (Rich Text), strip for others
+  bibliography = bibliography.replace(/\s+/g, ' ').trim();
   parenthetical = parenthetical.replace(/<[^>]*>/g, '').trim();
   narrative = narrative.replace(/<[^>]*>/g, '').trim();
 

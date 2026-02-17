@@ -1,3 +1,4 @@
+
 /**
  * XEENAPS PKM - GROQ TRACER AI SERVICE
  * Specialized in contextual quote discovery and academic paraphrasing.
@@ -5,57 +6,41 @@
  */
 
 function handleAiTracerQuoteExtraction(payload) {
-  const { collectionId, contextQuery } = payload;
+  const { collectionId, contextQuery, extractedJsonId, nodeUrl } = payload;
   const keys = getKeysFromSheet('Groq', 2);
   if (!keys || keys.length === 0) return { status: 'error', message: 'No Groq keys found.' };
 
-  // 1. GET SOURCE CONTEXT
+  // 1. GET SOURCE CONTEXT - Direct lookup from payload
   let fullText = "";
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEETS.LIBRARY);
-    const sheet = ss.getSheetByName("Collections");
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const idIdx = headers.indexOf('id');
-    const extractedIdx = headers.indexOf('extractedJsonId');
-    const nodeIdx = headers.indexOf('storageNodeUrl');
-    
-    let extractedId, nodeUrl;
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][idIdx] === collectionId) {
-        extractedId = data[i][extractedIdx];
-        nodeUrl = data[i][nodeIdx];
-        break;
-      }
-    }
-
-    if (extractedId) {
+    if (extractedJsonId) {
       const myUrl = ScriptApp.getService().getUrl();
       const isLocal = !nodeUrl || nodeUrl === "" || nodeUrl === myUrl;
+      
       if (isLocal) {
-        fullText = JSON.parse(DriveApp.getFileById(extractedId).getBlob().getDataAsString()).fullText;
+        fullText = JSON.parse(DriveApp.getFileById(extractedJsonId).getBlob().getDataAsString()).fullText;
       } else {
-        const remoteRes = UrlFetchApp.fetch(nodeUrl + (nodeUrl.includes('?') ? '&' : '?') + "action=getFileContent&fileId=" + extractedId);
+        const remoteRes = UrlFetchApp.fetch(nodeUrl + (nodeUrl.includes('?') ? '&' : '?') + "action=getFileContent&fileId=" + extractedJsonId);
         fullText = JSON.parse(JSON.parse(remoteRes.getContentText()).content).fullText;
       }
     }
   } catch (e) {
-    return { status: 'error', message: "Document context unavailable." };
+    return { status: 'error', message: "Document context unavailable. " + e.toString() };
   }
 
-  if (!fullText) return { status: 'error', message: "Extracted content empty." };
+  if (!fullText) return { status: 'error', message: "Extracted content empty or not found." };
 
   // MANDATORY: FULL SCAN UP TO 100,000 CHARS
   const contextSnippet = fullText.substring(0, 100000);
 
   const prompt = `ACT AS A PRECISION RESEARCH ARCHIVIST.
-  YOUR TASK: IDENTIFY THREE (3) DISTINCT EVIDENCE BLOCKS (VERBATIM QUOTES) RELEVANT TO: "${contextQuery}".
+  YOUR TASK: IDENTIFY BETWEEN 3 TO 10 DISTINCT EVIDENCE BLOCKS (VERBATIM QUOTES) RELEVANT TO: "${contextQuery}".
 
   --- SEMANTIC SKIMMING RULES (CRITICAL) ---
-  1. SCAN THE ENTIRE DOCUMENT: Do not just pick the first 3 paragraphs. You must scan the Intro, Body, Results, and Conclusion. 
-  2. DIVERSITY: Ensure the 3 quotes are geographically distant within the document (e.g., one from Intro, one from Results, one from Conclusion).
-  3. CONTEXT RELEVANCE: Prioritize sections that directly explain "${contextQuery}" even if they appear late in the text.
-  4. NO MONOTONY: Do not return redundant information. Each quote must provide a unique semantic angle.
+  1. DYNAMIC QUANTITY: Extract at least 3 quotes, up to 10 max. STOP extracting if relevance drops. Prioritize Quality over Quantity.
+  2. PRIORITIZE SEMANTIC MATCH: The quote MUST strongly support or relate to the user query: "${contextQuery}".
+  3. DIVERSE SEMANTIC ANGLES: Extract quotes that cover different aspects of the query (definition, application, pros/cons, results). Avoid redundant information.
+  4. SCAN THE ENTIRE DOCUMENT: Look for evidence in Intro, Body, Results, and Conclusion.
 
   --- OUTPUT FORMAT ---
   1. originalText: Exact word-for-word string from the text.
@@ -82,7 +67,7 @@ function handleAiTracerQuoteExtraction(payload) {
             { role: "system", content: "You are a professional academic data extractor. You scan entire documents to find the most relevant contextual evidence. Always respond in raw JSON." },
             { role: "user", content: prompt }
           ],
-          temperature: 0.4, // TUNED FOR BETTER EXPLORATION
+          temperature: 0.6, // INCREASED TO 0.6 FOR BETTER VARIETY & DISCOVERY
           response_format: { type: "json_object" }
         }),
         muteHttpExceptions: true

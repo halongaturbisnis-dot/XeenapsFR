@@ -59,7 +59,13 @@ const ConsultationChatModal: React.FC<ConsultationChatModalProps> = ({ collectio
     setAnswerContent(null);
 
     try {
-      const result = await callAiConsult(collection.id, question);
+      const result = await callAiConsult(
+        collection.id, 
+        question, 
+        collection.extractedJsonId || '', 
+        collection.storageNodeUrl || ''
+      );
+      
       if (result) {
         setAnswerContent(result);
         

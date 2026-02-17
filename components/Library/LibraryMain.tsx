@@ -219,13 +219,23 @@ const LibraryMain: React.FC<LibraryMainProps> = ({ items, isLoading: isGlobalLoa
     const idsToDelete = [...selectedIds];
     setSelectedIds([]);
 
+    // Optimistic Update: Kurangi total count segera
+    setTotalItemsServer(prev => Math.max(0, prev - idsToDelete.length));
+
     // OPTIMISTIC DELETE ON SUPABASE
     await performDelete(serverItems, setServerItems, idsToDelete, async (id) => {
        // Cleanup physical files first (GAS)
        await deleteLibraryItem(id);
        // Cleanup registry (Supabase)
-       return await deleteLibraryItemFromSupabase(id);
+       const success = await deleteLibraryItemFromSupabase(id);
+       // DISPATCH EVENT: Notify App.tsx to update global state for Dashboard consistency
+       if (success) {
+         window.dispatchEvent(new CustomEvent('xeenaps-library-deleted', { detail: id }));
+       }
+       return success;
     }, () => {
+      // Rollback count if error
+      setTotalItemsServer(prev => prev + idsToDelete.length);
       showXeenapsAlert({ icon: 'error', title: 'SYNC FAILED', text: 'Error deleting from server.' });
     });
     showXeenapsToast('success', 'Bulk deletion processed successfully');
@@ -250,6 +260,7 @@ const LibraryMain: React.FC<LibraryMainProps> = ({ items, isLoading: isGlobalLoa
 
   const handleDetailDelete = (id: string) => {
     setServerItems(prev => prev.filter(i => i.id !== id));
+    setTotalItemsServer(prev => Math.max(0, prev - 1));
   };
 
   const formatDateTime = (dateStr: string) => {

@@ -130,8 +130,14 @@ function doPost(e) {
     }
     
     // NEW ACTION: aiConsultProxy
+    // FIX: Updated to accept extractedJsonId and nodeUrl directly from payload
     if (action === 'aiConsultProxy') {
-      return createJsonResponse(handleAiConsultRequest(body.collectionId, body.question));
+      return createJsonResponse(handleAiConsultRequest(
+        body.collectionId, 
+        body.question,
+        body.extractedJsonId, 
+        body.nodeUrl
+      ));
     }
 
     // NEW ACTION: generateCV_PDF

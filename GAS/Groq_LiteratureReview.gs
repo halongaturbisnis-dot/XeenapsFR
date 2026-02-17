@@ -6,7 +6,8 @@
 
 function handleAiReviewRequest(subAction, payload) {
   if (subAction === 'extract') {
-    return callGroqReviewExtractor(payload.collectionId, payload.centralQuestion);
+    // UPDATED: Pass explicit file coordinates from frontend
+    return callGroqReviewExtractor(payload.collectionId, payload.centralQuestion, payload.extractedJsonId, payload.nodeUrl);
   } else if (subAction === 'synthesize') {
     return callGroqNarrativeSynthesizer(payload.matrix, payload.centralQuestion);
   }
@@ -16,44 +17,31 @@ function handleAiReviewRequest(subAction, payload) {
 /**
  * Matrix Extraction: Membedah 1 dokumen untuk menjawab pertanyaan utama.
  * Karakter dibatasi 35.000 sesuai instruksi.
+ * UPDATED: No longer looks up Google Sheets for file ID. Uses direct parameters.
  */
-function callGroqReviewExtractor(collectionId, centralQuestion) {
+function callGroqReviewExtractor(collectionId, centralQuestion, extractedJsonId, nodeUrl) {
   const keys = getKeysFromSheet('Groq', 2); 
   if (!keys || keys.length === 0) return { status: 'error', message: 'No Groq keys found.' };
 
-  // 1. GET SOURCE CONTEXT FROM LIBRARY
+  // 1. GET SOURCE CONTEXT FROM LIBRARY (DIRECT ACCESS)
   let context = "";
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEETS.LIBRARY);
-    const sheet = ss.getSheetByName("Collections");
-    const data = sheet.getDataRange().getValues();
-    const idIdx = data[0].indexOf('id');
-    const extractedIdx = data[0].indexOf('extractedJsonId');
-    const nodeIdx = data[0].indexOf('storageNodeUrl');
-    
-    let extractedId, nodeUrl;
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][idIdx] === collectionId) {
-        extractedId = data[i][extractedIdx];
-        nodeUrl = data[i][nodeIdx];
-        break;
-      }
-    }
-
-    if (extractedId) {
+    if (extractedJsonId) {
       const myUrl = ScriptApp.getService().getUrl();
       const isLocal = !nodeUrl || nodeUrl === "" || nodeUrl === myUrl;
       let fullText = "";
 
       if (isLocal) {
-        const file = DriveApp.getFileById(extractedId);
+        const file = DriveApp.getFileById(extractedJsonId);
         fullText = JSON.parse(file.getBlob().getDataAsString()).fullText;
       } else {
-        const remoteRes = UrlFetchApp.fetch(nodeUrl + (nodeUrl.indexOf('?') === -1 ? '?' : '&') + "action=getFileContent&fileId=" + extractedId);
+        const remoteRes = UrlFetchApp.fetch(nodeUrl + (nodeUrl.indexOf('?') === -1 ? '?' : '&') + "action=getFileContent&fileId=" + extractedJsonId);
         fullText = JSON.parse(JSON.parse(remoteRes.getContentText()).content).fullText;
       }
       // MANDATORY LIMIT: 35.000 characters
       context = fullText.substring(0, 35000); 
+    } else {
+      return { status: 'error', message: "No extracted content ID provided." };
     }
   } catch (e) {
     return { status: 'error', message: "Context retrieval failed: " + e.toString() };

@@ -5,8 +5,9 @@
  * VERSION: 2.2 (Timeout Fix & Language Mirroring)
  */
 
-function handleAiConsultRequest(collectionId, question) {
-  return callGroqConsultant(question, collectionId);
+function handleAiConsultRequest(collectionId, question, extractedJsonId, nodeUrl) {
+  // Pass the file coordinates directly to the consultant function
+  return callGroqConsultant(question, collectionId, extractedJsonId, nodeUrl);
 }
 
 /**
@@ -38,40 +39,24 @@ function cleanAiOutputToHtml(text) {
   return clean;
 }
 
-function callGroqConsultant(prompt, collectionId) {
+function callGroqConsultant(prompt, collectionId, extractedJsonId, nodeUrl) {
   const keys = getKeysFromSheet('Groq', 2); 
   if (!keys || keys.length === 0) return { status: 'error', message: 'No Groq keys found in database.' };
   
   // 1. GET SOURCE CONTEXT FROM LIBRARY
+  // UPDATED: Uses direct file parameters (Hybrid Cloud Architecture)
   let context = "";
   try {
-    const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEETS.LIBRARY);
-    const sheet = ss.getSheetByName("Collections");
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const idIdx = headers.indexOf('id');
-    const extractedIdx = headers.indexOf('extractedJsonId');
-    const nodeIdx = headers.indexOf('storageNodeUrl');
-    
-    let extractedId, nodeUrl;
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][idIdx] === collectionId) {
-        extractedId = data[i][extractedIdx];
-        nodeUrl = data[i][nodeIdx];
-        break;
-      }
-    }
-
-    if (extractedId) {
+    if (extractedJsonId) {
       const myUrl = ScriptApp.getService().getUrl();
       const isLocal = !nodeUrl || nodeUrl === "" || nodeUrl === myUrl;
       let fullText = "";
 
       if (isLocal) {
-        const file = DriveApp.getFileById(extractedId);
+        const file = DriveApp.getFileById(extractedJsonId);
         fullText = JSON.parse(file.getBlob().getDataAsString()).fullText;
       } else {
-        const remoteRes = UrlFetchApp.fetch(nodeUrl + (nodeUrl.indexOf('?') === -1 ? '?' : '&') + "action=getFileContent&fileId=" + extractedId);
+        const remoteRes = UrlFetchApp.fetch(nodeUrl + (nodeUrl.indexOf('?') === -1 ? '?' : '&') + "action=getFileContent&fileId=" + extractedJsonId);
         fullText = JSON.parse(JSON.parse(remoteRes.getContentText()).content).fullText;
       }
       context = fullText.substring(0, 100000); 
